@@ -228,11 +228,8 @@ const utils = {
 
 // ===== API FUNCTIONS =====
 const api = {
-    async fetchProducts() {
+    async fetchProducts(userId) {
         try {
-            const urlPath = window.location.pathname;
-            const userId = "6ab3f0698379f17db774368e";
-            
             const response = await fetch(`${CONFIG.API_BASE_URL}/dashboard/${userId}`, { 
                 mode: "cors" 
             });
@@ -704,7 +701,7 @@ const app = {
             }
 
             // Fetch and render products
-            const products = await api.fetchProducts();
+            const products = await api.fetchProducts(appState.currentUser.id);
             
             products.forEach(product => {
                 appState.addProduct({
