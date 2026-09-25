@@ -111,9 +111,6 @@ const elements = {
     searchClear: document.getElementById('search-clear'),
     searchEmpty: document.getElementById('search-empty'),
     storeName: document.getElementById('store-name'),
-    mobileCartButton: document.getElementById('mobile-cart-toggle'),
-    mobileCartCount: document.getElementById('mobile-cart-count'),
-    mobileCartTotal: document.getElementById('mobile-cart-total'),
     
     // Categories
     categoriesContainer: document.getElementById('categories'),
@@ -321,7 +318,6 @@ const ui = {
     updateCartBadge() {
         const itemCount = appState.getCartItemCount();
         elements.cartBadge.textContent = itemCount;
-        elements.mobileCartButton.classList.toggle('has-items', itemCount > 0);
         
         if (itemCount > 0) {
             elements.cartBadge.classList.add('visible');
@@ -338,8 +334,6 @@ const ui = {
         // Update totals
         elements.totalItems.textContent = itemCount;
         elements.totalPrice.textContent = utils.formatCurrency(total);
-        elements.mobileCartCount.textContent = itemCount;
-        elements.mobileCartTotal.textContent = utils.formatCurrency(total);
 
         // Update checkout button
         elements.checkoutBtn.disabled = itemCount === 0;
@@ -531,7 +525,6 @@ const eventHandlers = {
     init() {
         // Cart controls
         elements.cartButton.addEventListener('click', () => ui.openCart());
-        elements.mobileCartButton.addEventListener('click', () => ui.openCart());
         elements.cartClose.addEventListener('click', () => ui.closeCart());
         elements.cartOverlay.addEventListener('click', () => ui.closeCart());
         elements.checkoutBtn.addEventListener('click', () => ui.showCheckoutModal());
