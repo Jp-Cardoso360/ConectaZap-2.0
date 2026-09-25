@@ -209,25 +209,6 @@ const utils = {
         return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(normalizedColor)
             ? normalizedColor
             : CONFIG.DEFAULT_PRIMARY_COLOR;
-    },
-
-    getSystemColorVariants(color) {
-        const primary = this.getSystemColor(color);
-        const hex = primary.slice(1);
-        const expandedHex = hex.length === 3
-            ? hex.split('').map(digit => digit + digit).join('')
-            : hex;
-        const channels = [0, 2, 4].map(index => parseInt(expandedHex.slice(index, index + 2), 16));
-        const adjust = (amount) => channels
-            .map(channel => Math.max(0, Math.min(255, Math.round(channel + amount))))
-            .map(channel => channel.toString(16).padStart(2, '0'))
-            .join('');
-
-        return {
-            primary,
-            dark: `#${adjust(-35)}`,
-            light: `#${adjust(45)}`
-        };
     }
 };
 
@@ -684,10 +665,10 @@ const app = {
             // Fetch user data
             appState.currentUser = await api.fetchUserData();
 
-            const systemColors = utils.getSystemColorVariants(appState.currentUser.color);
-            document.documentElement.style.setProperty('--system-primary-color', systemColors.primary);
-            document.documentElement.style.setProperty('--system-primary-dark', systemColors.dark);
-            document.documentElement.style.setProperty('--system-primary-light', systemColors.light);
+            document.documentElement.style.setProperty(
+                '--system-primary-color',
+                utils.getSystemColor(appState.currentUser.color)
+            );
             
             // Update brand name with user's business name
             const brandNameElement = document.querySelector('.brand-name');
