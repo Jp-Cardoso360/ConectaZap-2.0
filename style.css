@@ -2613,6 +2613,31 @@ body {
 }
 
 @media (max-width: 680px) {
+    #product-modal,
+    #success-modal {
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+
+    #product-modal > .modal-content {
+        width: 80vw;
+        max-width: 560px;
+        max-height: 88vh;
+        max-height: 88dvh;
+        margin: auto;
+        border-radius: 1rem;
+    }
+
+    #success-modal > .success-modal {
+        width: 80vw;
+        max-width: 400px;
+        max-height: 88vh;
+        max-height: 88dvh;
+        margin: auto;
+        border-radius: 1rem;
+    }
+
     #checkout-modal {
         align-items: stretch;
         padding: 0;
