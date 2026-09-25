@@ -193,6 +193,13 @@
                         <input type="text" id="customer-address" name="address" required 
                                placeholder="Ex: Av. Paulista, 2000, São Paulo">
                     </div>
+
+                    <div class="form-group">
+                        <label for="delivery-place">Local de entrega</label>
+                        <select id="delivery-place" name="deliveryPlace" required>
+                            <option value="">Carregando locais disponíveis...</option>
+                        </select>
+                    </div>
                     
                     <div class="form-group">
                         <label for="payment-method">Forma de Pagamento</label>
@@ -211,6 +218,10 @@
                             <div class="summary-row">
                                 <span>Total de itens:</span>
                                 <strong id="checkout-items">0</strong>
+                            </div>
+                            <div class="summary-row">
+                                <span>Taxa de entrega:</span>
+                                <strong id="checkout-delivery-fee">R$ 0,00</strong>
                             </div>
                             <div class="summary-row total">
                                 <span>Valor total:</span>

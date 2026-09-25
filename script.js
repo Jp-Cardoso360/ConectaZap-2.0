@@ -14,6 +14,8 @@ class AppState {
         this.cart = new Map();
         this.currentUser = null;
         this.userGoal = null;
+        this.deliveryPlaces = [];
+        this.selectedDeliveryPlace = null;
         this.goalAchieved = false;
         this.isLoading = false;
     }
@@ -151,8 +153,10 @@ const elements = {
     checkoutForm: document.getElementById('checkout-form'),
     customerName: document.getElementById('customer-name'),
     customerAddress: document.getElementById('customer-address'),
+    deliveryPlace: document.getElementById('delivery-place'),
     paymentMethod: document.getElementById('payment-method'),
     checkoutItems: document.getElementById('checkout-items'),
+    checkoutDeliveryFee: document.getElementById('checkout-delivery-fee'),
     checkoutTotal: document.getElementById('checkout-total'),
     
     // Success Modal
@@ -254,6 +258,40 @@ const api = {
         } catch (error) {
             console.error('Error fetching products:', error);
             throw error;
+        }
+    },
+
+    async fetchDeliveryPlaces(userId) {
+        try {
+            const response = await fetch(`${CONFIG.API_BASE_URL}/lugares`);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            const places = Array.isArray(result)
+                ? result
+                : result.lugares || result.places || result.data || [];
+
+            if (!Array.isArray(places)) return [];
+
+            return places
+                .filter(place => {
+                    const ownerId = place.user_id || place.userId ||
+                        (typeof place.user === 'object' ? place.user?._id : place.user);
+                    return !ownerId || String(ownerId) === String(userId);
+                })
+                .filter(place => place.disponivel !== false && place.ativo !== false && place.status !== false)
+                .map(place => ({
+                    id: String(place._id || place.id || place.nome || place.name || ''),
+                    name: String(place.nome || place.name || place.lugar || place.local || '').trim(),
+                    fee: Number(place.taxaEntrega ?? place.taxa_entrega ?? place.taxa ?? place.deliveryFee ?? 0)
+                }))
+                .filter(place => place.id && place.name && Number.isFinite(place.fee) && place.fee >= 0);
+        } catch (error) {
+            console.warn('Error fetching delivery places:', error);
+            return [];
         }
     },
 
@@ -370,6 +408,36 @@ const ui = {
 
         // Check goal achievement
         this.checkGoalAchievement(total);
+    },
+
+    renderDeliveryPlaces(places) {
+        elements.deliveryPlace.innerHTML = '';
+        elements.deliveryPlace.add(new Option('Selecione um local', ''));
+
+        if (places.length === 0) {
+            elements.deliveryPlace.add(new Option('Nenhum local disponível no momento', ''));
+            elements.deliveryPlace.disabled = true;
+            return;
+        }
+
+        elements.deliveryPlace.disabled = false;
+        places.forEach(place => {
+            const option = new Option(
+                `${place.name} · Entrega ${utils.formatCurrency(place.fee)}`,
+                place.id
+            );
+            elements.deliveryPlace.add(option);
+        });
+    },
+
+    updateCheckoutSummary() {
+        const selectedPlace = appState.selectedDeliveryPlace;
+        const deliveryFee = selectedPlace?.fee || 0;
+
+        elements.checkoutDeliveryFee.textContent = selectedPlace
+            ? utils.formatCurrency(deliveryFee)
+            : 'Selecione um local';
+        elements.checkoutTotal.textContent = utils.formatCurrency(appState.getCartTotal() + deliveryFee);
     },
 
     checkGoalAchievement(total) {
@@ -501,11 +569,10 @@ const ui = {
 
     showCheckoutModal() {
         const cartItems = appState.getCartItems();
-        const total = appState.getCartTotal();
         const itemCount = appState.getCartItemCount();
 
         elements.checkoutItems.textContent = itemCount;
-        elements.checkoutTotal.textContent = utils.formatCurrency(total);
+        this.updateCheckoutSummary();
 
         this.closeCart();
         utils.showModal(elements.checkoutModal);
@@ -537,6 +604,12 @@ const eventHandlers = {
         elements.cartClose.addEventListener('click', () => ui.closeCart());
         elements.cartOverlay.addEventListener('click', () => ui.closeCart());
         elements.checkoutBtn.addEventListener('click', () => ui.showCheckoutModal());
+        elements.deliveryPlace.addEventListener('change', () => {
+            appState.selectedDeliveryPlace = appState.deliveryPlaces.find(
+                place => place.id === elements.deliveryPlace.value
+            ) || null;
+            ui.updateCheckoutSummary();
+        });
         elements.cartItems.addEventListener('click', event => {
             const removeButton = event.target.closest('.cart-item-remove');
             if (!removeButton) return;
@@ -672,6 +745,9 @@ const eventHandlers = {
         const formData = new FormData(e.target);
         const customerName = formData.get('name');
         const customerAddress = formData.get('address');
+        const deliveryPlace = appState.deliveryPlaces.find(
+            place => place.id === formData.get('deliveryPlace')
+        );
         const paymentMethod = formData.get('payment');
 
         if (!customerName || !customerAddress || !paymentMethod) {
@@ -679,15 +755,24 @@ const eventHandlers = {
             return;
         }
 
+        if (!deliveryPlace) {
+            alert('Selecione um local de entrega disponível.');
+            elements.deliveryPlace.focus();
+            return;
+        }
+
         try {
             const cartItems = appState.getCartItems();
-            const total = appState.getCartTotal();
+            const subtotal = appState.getCartTotal();
+            const deliveryFee = deliveryPlace.fee;
+            const total = subtotal + deliveryFee;
             const itemCount = appState.getCartItemCount();
 
             // Build WhatsApp message
             let message = `*Novo Pedido - ${appState.currentUser?.name || 'ConectaZap'}*\n\n`;
             message += `👤 *Cliente:* ${customerName}\n`;
-            message += `📍 *Endereço:* ${customerAddress}\n`;
+            message += `📍 *Local de entrega:* ${deliveryPlace.name}\n`;
+            message += `🏠 *Endereço:* ${customerAddress}\n`;
             message += `💳 *Pagamento:* ${paymentMethod}\n\n`;
             message += `🛍️ *Produtos:*\n`;
 
@@ -697,6 +782,7 @@ const eventHandlers = {
 
             message += `\n📊 *Resumo:*\n`;
             message += `• Total de itens: ${itemCount}\n`;
+            message += `• Taxa de entrega: ${utils.formatCurrency(deliveryFee)}\n`;
             message += `• *Valor total: ${utils.formatCurrency(total)}*`;
 
             // Send to WhatsApp
@@ -752,6 +838,9 @@ const app = {
                 elements.brandName.textContent = appState.currentUser.name;
                 elements.storeName.textContent = appState.currentUser.name;
             }
+
+            appState.deliveryPlaces = await api.fetchDeliveryPlaces(appState.currentUser.id);
+            ui.renderDeliveryPlaces(appState.deliveryPlaces);
 
             // Fetch user goal
             appState.userGoal = await api.fetchUserGoal();
