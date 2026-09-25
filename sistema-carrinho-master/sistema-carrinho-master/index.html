@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ConectaZap - Catálogo de Produtos</title>
+    <meta name="description" content="Catálogo de produtos moderno com integração WhatsApp">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="ConectaZap - Catálogo de Produtos">
+    <meta property="og:description" content="Catálogo de produtos moderno com integração WhatsApp">
+    
+    <!-- Favicon -->
+    <link rel="shortcut icon" href="Imagens/ico.png" type="image/x-icon">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" 
+          integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" 
+          crossorigin="anonymous" referrerpolicy="no-referrer">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Scripts -->
+    <script src="script.js" defer></script>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading" class="loading-screen">
+        <div class="loading-container">
+            <div class="loading-spinner"></div>
+            <h3 class="loading-text">Carregando produtos...</h3>
+            <p class="loading-subtitle">Por favor, aguarde um momento</p>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-container">
+            <div class="brand">
+                <h1 class="brand-name">TechNet</h1>
+                <span class="brand-subtitle">Catálogo de Produtos</span>
+            </div>
+            
+            <button class="cart-button" id="cart-toggle">
+                <i class="fas fa-shopping-cart"></i>
+                <span class="cart-text">Meu Carrinho</span>
+                <div class="cart-badge" id="cart-badge">0</div>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Categories Navigation -->
+        <section class="categories-section">
+            <div class="categories-container">
+                <h2 class="section-title">Categorias</h2>
+                <div class="categories-scroll" id="categories">
+                    <button class="category-btn active" data-target="destaques">
+                        <i class="fas fa-star"></i>
+                        <span>Destaques</span>
+                    </button>
+                    <button class="category-btn" data-target="smartphones">
+                        <i class="fas fa-mobile-alt"></i>
+                        <span>Smartphones</span>
+                    </button>
+                    <button class="category-btn" data-target="computadores">
+                        <i class="fas fa-laptop"></i>
+                        <span>Computadores</span>
+                    </button>
+                    <button class="category-btn" data-target="audio">
+                        <i class="fas fa-headphones"></i>
+                        <span>Áudio</span>
+                    </button>
+                    <button class="category-btn" data-target="energia">
+                        <i class="fas fa-battery-full"></i>
+                        <span>Energia</span>
+                    </button>
+                    <button class="category-btn" data-target="casa">
+                        <i class="fas fa-home"></i>
+                        <span>Casa Inteligente</span>
+                    </button>
+                    <button class="category-btn" data-target="tecnologia">
+                        <i class="fas fa-microchip"></i>
+                        <span>Tecnologia</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Products Section -->
+        <section class="products-section">
+            <div class="products-container">
+                <h2 class="section-title">Nossos Produtos</h2>
+                <div class="products-grid" id="products-grid">
+                    <!-- Products will be dynamically loaded here -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Shopping Cart Sidebar -->
+    <aside class="cart-sidebar" id="cart-sidebar">
+        <div class="cart-header">
+            <h3 class="cart-title">
+                <i class="fas fa-shopping-cart"></i>
+                Meu Carrinho
+            </h3>
+            <button class="cart-close" id="cart-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="cart-content">
+            <div class="cart-items" id="cart-items">
+                <!-- Cart items will be dynamically loaded here -->
+            </div>
+            
+            <div class="cart-empty" id="cart-empty">
+                <i class="fas fa-shopping-cart"></i>
+                <p>Seu carrinho está vazio</p>
+                <span>Adicione produtos para continuar</span>
+            </div>
+        </div>
+        
+        <div class="cart-footer">
+            <div class="cart-summary">
+                <div class="summary-row">
+                    <span>Total de itens:</span>
+                    <strong id="total-items">0</strong>
+                </div>
+                <div class="summary-row total">
+                    <span>Total:</span>
+                    <strong id="total-price">R$ 0,00</strong>
+                </div>
+            </div>
+            
+            <button class="checkout-btn" id="checkout-btn" disabled>
+                <i class="fas fa-credit-card"></i>
+                Finalizar Pedido
+            </button>
+        </div>
+    </aside>
+
+    <!-- Product Detail Modal -->
+    <div class="modal-overlay" id="product-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Detalhes do Produto</h3>
+                <button class="modal-close" id="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="product-detail">
+                    <div class="product-image-container">
+                        <img src="" alt="" class="product-detail-image" id="modal-image">
+                    </div>
+                    
+                    <div class="product-info">
+                        <h4 class="product-detail-name" id="modal-name"></h4>
+                        <p class="product-detail-price" id="modal-price"></p>
+                        <p class="product-detail-description" id="modal-description"></p>
+                        
+                        <div class="quantity-controls">
+                            <button class="quantity-btn minus" id="modal-minus">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <span class="quantity-display" id="modal-quantity">0</span>
+                            <button class="quantity-btn plus" id="modal-plus">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Checkout Modal -->
+    <div class="modal-overlay" id="checkout-modal">
+        <div class="modal-content checkout-modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Finalizar Pedido</h3>
+                <button class="modal-close" id="checkout-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <form class="checkout-form" id="checkout-form">
+                    <div class="form-group">
+                        <label for="customer-name">Nome Completo</label>
+                        <input type="text" id="customer-name" name="name" required 
+                               placeholder="Digite seu nome completo">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="customer-address">Endereço de Entrega</label>
+                        <input type="text" id="customer-address" name="address" required 
+                               placeholder="Ex: Av. Paulista, 2000, São Paulo">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="payment-method">Forma de Pagamento</label>
+                        <select id="payment-method" name="payment" required>
+                            <option value="">Selecione uma opção</option>
+                            <option value="Dinheiro">Dinheiro</option>
+                            <option value="Débito">Cartão de Débito</option>
+                            <option value="Crédito">Cartão de Crédito</option>
+                            <option value="Pix">PIX</option>
+                        </select>
+                    </div>
+                    
+                    <div class="order-summary">
+                        <h4>Resumo do Pedido</h4>
+                        <div class="summary-details">
+                            <div class="summary-row">
+                                <span>Total de itens:</span>
+                                <strong id="checkout-items">0</strong>
+                            </div>
+                            <div class="summary-row total">
+                                <span>Valor total:</span>
+                                <strong id="checkout-total">R$ 0,00</strong>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="whatsapp-btn">
+                        <i class="fab fa-whatsapp"></i>
+                        Enviar Pedido via WhatsApp
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div class="modal-overlay" id="success-modal">
+        <div class="modal-content success-modal">
+            <div class="success-content">
+                <div class="success-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h3>Pedido Enviado!</h3>
+                <p>Seu pedido foi enviado com sucesso via WhatsApp.</p>
+                <button class="success-btn" id="success-close">Continuar Comprando</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Goal Achievement Alert -->
+    <div class="alert-overlay" id="goal-alert">
+        <div class="alert-content">
+            <div class="alert-icon">
+                <i class="fas fa-trophy"></i>
+            </div>
+            <h3>Parabéns!</h3>
+            <p>Meta de <strong id="goal-amount">R$ 0,00</strong> atingida!</p>
+            <div class="alert-buttons">
+                <button class="alert-btn secondary" id="continue-shopping">Continuar</button>
+                <button class="alert-btn primary" id="finish-order">Finalizar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <p>© Desenvolvido por <a href="https://wa.me/5511920394311" target="_blank">NetixZae</a></p>
+        </div>
+    </footer>
+
+    <!-- Cart Overlay -->
+    <div class="cart-overlay" id="cart-overlay"></div>
+</body>
+</html>
+
