@@ -209,6 +209,20 @@ const utils = {
         return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(normalizedColor)
             ? normalizedColor
             : CONFIG.DEFAULT_PRIMARY_COLOR;
+    },
+
+    getDarkerSystemColor(color) {
+        const hex = this.getSystemColor(color).slice(1);
+        const expandedHex = hex.length === 3
+            ? hex.split('').map(digit => digit + digit).join('')
+            : hex;
+
+        const darkerHex = [0, 2, 4]
+            .map(index => Math.round(parseInt(expandedHex.slice(index, index + 2), 16) * 0.8))
+            .map(channel => channel.toString(16).padStart(2, '0'))
+            .join('');
+
+        return `#${darkerHex}`;
     }
 };
 
@@ -668,6 +682,10 @@ const app = {
             document.documentElement.style.setProperty(
                 '--system-primary-color',
                 utils.getSystemColor(appState.currentUser.color)
+            );
+            document.documentElement.style.setProperty(
+                '--system-primary-hover-color',
+                utils.getDarkerSystemColor(appState.currentUser.color)
             );
             
             // Update brand name with user's business name
