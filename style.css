@@ -1402,6 +1402,11 @@ body {
     display: block !important;
 }
 
+.modal-overlay.visible,
+.alert-overlay.visible {
+    display: flex !important;
+}
+
 .sr-only {
     position: absolute;
     width: 1px;
