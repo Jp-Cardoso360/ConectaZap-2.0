@@ -116,6 +116,17 @@ body {
     padding: var(--spacing-xl);
 }
 
+.loading-logo {
+    display: block;
+    width: min(72vw, 250px);
+    max-height: 112px;
+    object-fit: contain;
+    margin-bottom: 1.25rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.875rem;
+    background: #fff;
+}
+
 .loading-spinner {
     width: 60px;
     height: 60px;
@@ -2025,8 +2036,8 @@ body {
 
 .header-container {
     max-width: 960px;
-    min-height: 72px;
-    padding: 0.75rem 1.25rem;
+    min-height: 84px;
+    padding: 1rem 1.75rem;
 }
 
 .brand-name {
@@ -2285,8 +2296,8 @@ body {
 
 @media (max-width: 680px) {
     .header-container {
-        min-height: 64px;
-        padding: 0.5rem 1rem;
+        min-height: 76px;
+        padding: 0.75rem 1rem;
     }
 
     .brand-name {
@@ -2466,6 +2477,50 @@ body {
         width: 36px;
         height: 36px;
         flex-basis: 36px;
+    }
+}
+
+@media (min-width: 681px) {
+    .store-hero {
+        min-height: 300px;
+    }
+
+    .store-hero-image {
+        object-position: center center;
+    }
+
+    .products-grid {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        max-width: 100%;
+        margin-right: auto;
+        margin-left: auto;
+    }
+
+    .product-image-container {
+        min-height: 240px;
+        aspect-ratio: 16 / 10;
+        padding: 1.25rem;
+    }
+
+    .product-image {
+        width: min(100%, 360px);
+        margin: 0 auto;
+    }
+
+    .product-content {
+        align-items: center;
+        text-align: center;
+    }
+
+    .product-name,
+    .product-description {
+        text-align: center;
+    }
+
+    .product-purchase-row {
+        width: 100%;
+        justify-content: center;
+        gap: 1rem;
     }
 }
 
