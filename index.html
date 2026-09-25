@@ -42,20 +42,42 @@
     <header class="header">
         <div class="header-container">
             <div class="brand">
-                <h1 class="brand-name">TechNet</h1>
-                <span class="brand-subtitle">Catálogo de Produtos</span>
+                <h1 class="brand-name">ConectaZap Menu</h1>
+                <span class="brand-subtitle">Seu catálogo digital</span>
             </div>
-            
-            <button class="cart-button" id="cart-toggle">
-                <i class="fas fa-shopping-cart"></i>
-                <span class="cart-text">Meu Carrinho</span>
-                <div class="cart-badge" id="cart-badge">0</div>
-            </button>
+
+            <div class="header-actions">
+                <button class="header-icon-button" id="search-toggle" type="button" aria-label="Buscar produtos" aria-expanded="false">
+                    <i class="fas fa-search" aria-hidden="true"></i>
+                </button>
+                <button class="cart-button" id="cart-toggle" type="button" aria-label="Abrir carrinho">
+                    <i class="fas fa-shopping-cart" aria-hidden="true"></i>
+                    <span class="cart-text">Meu Carrinho</span>
+                    <span class="cart-badge" id="cart-badge">0</span>
+                </button>
+            </div>
         </div>
+        <form class="search-panel hidden" id="product-search-form" role="search">
+            <label class="sr-only" for="product-search-input">Buscar produtos</label>
+            <i class="fas fa-search" aria-hidden="true"></i>
+            <input id="product-search-input" type="search" placeholder="Buscar no catálogo" autocomplete="off">
+            <button class="search-clear" id="search-clear" type="button" aria-label="Limpar busca">
+                <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+        </form>
     </header>
 
     <!-- Main Content -->
     <main class="main-content">
+        <section class="store-hero" aria-labelledby="store-name">
+            <img class="store-hero-image" src="Imagens/Cardapio-Digital.png" alt="" fetchpriority="high">
+            <div class="store-hero-shade"></div>
+            <div class="store-hero-content">
+                <span class="store-hero-kicker">CATÁLOGO DIGITAL</span>
+                <h2 id="store-name">Bem-vindo</h2>
+                <p>Escolha seus produtos e faça seu pedido pelo WhatsApp.</p>
+            </div>
+        </section>
 
         <!-- Products Section -->
         <section class="products-section">
@@ -64,9 +86,20 @@
                 <div class="products-grid" id="products-grid">
                     <!-- Products will be dynamically loaded here -->
                 </div>
+                <p class="search-empty hidden" id="search-empty">Nenhum produto encontrado.</p>
             </div>
         </section>
     </main>
+
+    <button class="mobile-cart-bar" id="mobile-cart-toggle" type="button" aria-label="Abrir carrinho">
+        <span class="mobile-cart-icon"><i class="fas fa-shopping-cart" aria-hidden="true"></i></span>
+        <span class="mobile-cart-summary">
+            Carrinho (<strong id="mobile-cart-count">0</strong>)
+            <span aria-hidden="true">·</span>
+            <strong id="mobile-cart-total">R$ 0,00</strong>
+        </span>
+        <i class="fas fa-chevron-right mobile-cart-arrow" aria-hidden="true"></i>
+    </button>
 
     <!-- Shopping Cart Sidebar -->
     <aside class="cart-sidebar" id="cart-sidebar">

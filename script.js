@@ -105,6 +105,15 @@ const elements = {
     // Header
     cartButton: document.getElementById('cart-toggle'),
     cartBadge: document.getElementById('cart-badge'),
+    searchToggle: document.getElementById('search-toggle'),
+    searchForm: document.getElementById('product-search-form'),
+    searchInput: document.getElementById('product-search-input'),
+    searchClear: document.getElementById('search-clear'),
+    searchEmpty: document.getElementById('search-empty'),
+    storeName: document.getElementById('store-name'),
+    mobileCartButton: document.getElementById('mobile-cart-toggle'),
+    mobileCartCount: document.getElementById('mobile-cart-count'),
+    mobileCartTotal: document.getElementById('mobile-cart-total'),
     
     // Categories
     categoriesContainer: document.getElementById('categories'),
@@ -209,6 +218,19 @@ const utils = {
         return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(normalizedColor)
             ? normalizedColor
             : CONFIG.DEFAULT_PRIMARY_COLOR;
+    },
+
+    getDarkerSystemColor(color) {
+        const hex = this.getSystemColor(color).slice(1);
+        const expandedHex = hex.length === 3
+            ? hex.split('').map(digit => digit + digit).join('')
+            : hex;
+        const darkerHex = [0, 2, 4]
+            .map(index => Math.round(parseInt(expandedHex.slice(index, index + 2), 16) * 0.8))
+            .map(channel => channel.toString(16).padStart(2, '0'))
+            .join('');
+
+        return `#${darkerHex}`;
     }
 };
 
@@ -299,6 +321,7 @@ const ui = {
     updateCartBadge() {
         const itemCount = appState.getCartItemCount();
         elements.cartBadge.textContent = itemCount;
+        elements.mobileCartButton.classList.toggle('has-items', itemCount > 0);
         
         if (itemCount > 0) {
             elements.cartBadge.classList.add('visible');
@@ -315,6 +338,8 @@ const ui = {
         // Update totals
         elements.totalItems.textContent = itemCount;
         elements.totalPrice.textContent = utils.formatCurrency(total);
+        elements.mobileCartCount.textContent = itemCount;
+        elements.mobileCartTotal.textContent = utils.formatCurrency(total);
 
         // Update checkout button
         elements.checkoutBtn.disabled = itemCount === 0;
@@ -357,6 +382,7 @@ const ui = {
         const productElements = products.map((product, index) => {
             const productElement = document.createElement('div');
             productElement.className = 'product-card';
+            productElement.dataset.searchText = `${product.description} ${product.description2 || ''}`.toLocaleLowerCase('pt-BR');
             productElement.style.animationDelay = `${index * CONFIG.ANIMATION_DELAY}ms`;
             
             productElement.innerHTML = `
@@ -365,16 +391,19 @@ const ui = {
                 </div>
                 <div class="product-content">
                     <h3 class="product-name">${product.description}</h3>
-                    <div class="product-price">${utils.formatCurrency(product.price)}</div>
-                    <div class="product-controls">
-                        <div class="quantity-controls">
-                            <button class="quantity-btn minus" data-product-id="${product._id}" data-action="decrease">
-                                <i class="fas fa-minus"></i>
-                            </button>
-                            <span class="quantity-display" id="quantity-${product._id}">0</span>
-                            <button class="quantity-btn plus" data-product-id="${product._id}" data-action="increase">
-                                <i class="fas fa-plus"></i>
-                            </button>
+                    <p class="product-description">${product.description2 || ''}</p>
+                    <div class="product-purchase-row">
+                        <div class="product-price">${utils.formatCurrency(product.price)}</div>
+                        <div class="product-controls">
+                            <div class="quantity-controls">
+                                <button class="quantity-btn minus" data-product-id="${product._id}" data-action="decrease" aria-label="Diminuir quantidade">
+                                    <i class="fas fa-minus" aria-hidden="true"></i>
+                                </button>
+                                <span class="quantity-display" id="quantity-${product._id}">0</span>
+                                <button class="quantity-btn plus" data-product-id="${product._id}" data-action="increase" aria-label="Aumentar quantidade">
+                                    <i class="fas fa-plus" aria-hidden="true"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -502,9 +531,29 @@ const eventHandlers = {
     init() {
         // Cart controls
         elements.cartButton.addEventListener('click', () => ui.openCart());
+        elements.mobileCartButton.addEventListener('click', () => ui.openCart());
         elements.cartClose.addEventListener('click', () => ui.closeCart());
         elements.cartOverlay.addEventListener('click', () => ui.closeCart());
         elements.checkoutBtn.addEventListener('click', () => ui.showCheckoutModal());
+
+        elements.searchToggle.addEventListener('click', () => {
+            const isOpening = elements.searchForm.classList.contains('hidden');
+            elements.searchForm.classList.toggle('hidden', !isOpening);
+            elements.searchToggle.setAttribute('aria-expanded', String(isOpening));
+
+            if (isOpening) {
+                elements.searchInput.focus();
+            } else {
+                elements.searchInput.value = '';
+                this.filterProducts('');
+            }
+        });
+        elements.searchInput.addEventListener('input', () => this.filterProducts(elements.searchInput.value));
+        elements.searchClear.addEventListener('click', () => {
+            elements.searchInput.value = '';
+            this.filterProducts('');
+            elements.searchInput.focus();
+        });
 
         // Modal controls
         elements.modalClose.addEventListener('click', () => utils.hideModal(elements.productModal));
@@ -590,6 +639,20 @@ const eventHandlers = {
         });
     },
 
+    filterProducts(query) {
+        const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR');
+        const productCards = elements.productsGrid.querySelectorAll('.product-card');
+        let visibleProducts = 0;
+
+        productCards.forEach(card => {
+            const matches = card.dataset.searchText.includes(normalizedQuery);
+            card.classList.toggle('hidden', !matches);
+            if (matches) visibleProducts++;
+        });
+
+        elements.searchEmpty.classList.toggle('hidden', normalizedQuery.length === 0 || visibleProducts > 0);
+    },
+
     async handleCheckoutSubmit(e) {
         e.preventDefault();
         
@@ -668,11 +731,14 @@ const app = {
                 '--system-primary-color',
                 appState.currentUser.color
             );
+            document.documentElement.style.setProperty(
+                '--system-primary-hover-color',
+                utils.getDarkerSystemColor(appState.currentUser.color)
+            );
             
             // Update brand name with user's business name
-            const brandNameElement = document.querySelector('.brand-name');
-            if (brandNameElement && appState.currentUser) {
-                brandNameElement.textContent = appState.currentUser.name;
+            if (elements.storeName && appState.currentUser) {
+                elements.storeName.textContent = appState.currentUser.name;
             }
 
             // Fetch user goal
