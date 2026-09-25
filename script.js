@@ -65,6 +65,11 @@ class AppState {
         return this.getCartItems().reduce((total, item) => total + item.quantity, 0);
     }
 
+    getCartStorageKey() {
+        const userId = this.currentUser?.id || 'anonymous';
+        return `${CONFIG.CART_STORAGE_KEY}:${userId}`;
+    }
+
     clearCart() {
         this.cart.clear();
         this.products.forEach(product => product.quantity = 0);
@@ -75,7 +80,7 @@ class AppState {
     saveCartToStorage() {
         try {
             const cartData = Array.from(this.cart.entries());
-            localStorage.setItem(CONFIG.CART_STORAGE_KEY, JSON.stringify(cartData));
+            localStorage.setItem(this.getCartStorageKey(), JSON.stringify(cartData));
         } catch (error) {
             console.warn('Failed to save cart to localStorage:', error);
         }
@@ -83,7 +88,7 @@ class AppState {
 
     loadCartFromStorage() {
         try {
-            const cartData = localStorage.getItem(CONFIG.CART_STORAGE_KEY);
+            const cartData = localStorage.getItem(this.getCartStorageKey());
             if (cartData) {
                 const entries = JSON.parse(cartData);
                 this.cart = new Map(entries);
@@ -110,6 +115,7 @@ const elements = {
     searchInput: document.getElementById('product-search-input'),
     searchClear: document.getElementById('search-clear'),
     searchEmpty: document.getElementById('search-empty'),
+    brandName: document.querySelector('.brand-name'),
     storeName: document.getElementById('store-name'),
     
     // Categories
@@ -355,6 +361,9 @@ const ui = {
                         <div class="cart-item-price">${utils.formatCurrency(item.price)}</div>
                         <div class="cart-item-quantity">Quantidade: ${item.quantity}</div>
                     </div>
+                    <button class="cart-item-remove" type="button" data-product-id="${item._id}" aria-label="Remover ${item.description} do carrinho">
+                        <i class="fas fa-times" aria-hidden="true"></i>
+                    </button>
                 </div>
             `).join('');
         }
@@ -528,6 +537,17 @@ const eventHandlers = {
         elements.cartClose.addEventListener('click', () => ui.closeCart());
         elements.cartOverlay.addEventListener('click', () => ui.closeCart());
         elements.checkoutBtn.addEventListener('click', () => ui.showCheckoutModal());
+        elements.cartItems.addEventListener('click', event => {
+            const removeButton = event.target.closest('.cart-item-remove');
+            if (!removeButton) return;
+
+            const productId = removeButton.dataset.productId;
+            if (!appState.updateCartItem(productId, 0)) return;
+
+            ui.updateProductQuantityDisplay(productId, 0);
+            ui.updateCartBadge();
+            ui.updateCartSidebar();
+        });
 
         elements.searchToggle.addEventListener('click', () => {
             const isOpening = elements.searchForm.classList.contains('hidden');
@@ -711,14 +731,12 @@ const app = {
         try {
             ui.showLoading();
 
-            // Load cart from storage
-            appState.loadCartFromStorage();
-
             // Initialize event handlers
             eventHandlers.init();
 
             // Fetch user data
             appState.currentUser = await api.fetchUserData();
+            appState.loadCartFromStorage();
 
             document.documentElement.style.setProperty(
                 '--system-primary-color',
@@ -730,7 +748,8 @@ const app = {
             );
             
             // Update brand name with user's business name
-            if (elements.storeName && appState.currentUser) {
+            if (appState.currentUser) {
+                elements.brandName.textContent = appState.currentUser.name;
                 elements.storeName.textContent = appState.currentUser.name;
             }
 
@@ -761,8 +780,11 @@ const app = {
                 const product = appState.getProduct(productId);
                 if (product) {
                     product.quantity = item.quantity;
+                } else {
+                    appState.cart.delete(productId);
                 }
             });
+            appState.saveCartToStorage();
 
             ui.renderProducts(products);
             ui.updateCartBadge();
