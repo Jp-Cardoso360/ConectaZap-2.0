@@ -189,16 +189,16 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="customer-address">Endereço de Entrega</label>
-                        <input type="text" id="customer-address" name="address" required 
-                               placeholder="Ex: Av. Paulista, 2000, São Paulo">
-                    </div>
-
-                    <div class="form-group">
                         <label for="delivery-place">Local de entrega</label>
                         <select id="delivery-place" name="deliveryPlace" required>
                             <option value="">Carregando locais disponíveis...</option>
                         </select>
+                    </div>
+
+                    <div class="form-group hidden" id="customer-address-group">
+                        <label for="customer-address">Endereço de Entrega</label>
+                        <input type="text" id="customer-address" name="address" disabled
+                               placeholder="Digite seu endereço de entrega">
                     </div>
                     
                     <div class="form-group">

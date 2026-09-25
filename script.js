@@ -152,6 +152,7 @@ const elements = {
     checkoutClose: document.getElementById('checkout-close'),
     checkoutForm: document.getElementById('checkout-form'),
     customerName: document.getElementById('customer-name'),
+    customerAddressGroup: document.getElementById('customer-address-group'),
     customerAddress: document.getElementById('customer-address'),
     deliveryPlace: document.getElementById('delivery-place'),
     paymentMethod: document.getElementById('payment-method'),
@@ -282,7 +283,14 @@ const api = {
                         (typeof place.user === 'object' ? place.user?._id : place.user);
                     return !ownerId || String(ownerId) === String(userId);
                 })
-                .filter(place => place.disponivel !== false && place.ativo !== false && place.status !== false)
+                .filter(place => {
+                    const availability = place.disponivel ?? place.available ?? place.isAvailable ??
+                        place.ativo ?? place.active ?? place.status;
+                    if (availability === undefined) return true;
+                    if (availability === true) return true;
+                    return ['1', 'true', 'ativo', 'active', 'available', 'disponivel', 'disponível']
+                        .includes(String(availability).trim().toLocaleLowerCase('pt-BR'));
+                })
                 .map(place => ({
                     id: String(place._id || place.id || place.nome || place.name || ''),
                     name: String(place.nome || place.name || place.lugar || place.local || '').trim(),
@@ -411,23 +419,44 @@ const ui = {
     },
 
     renderDeliveryPlaces(places) {
+        const pickupPlace = {
+            id: '__pickup__',
+            name: 'Retirada no local',
+            fee: 0,
+            type: 'pickup'
+        };
+        appState.deliveryPlaces = [...places, pickupPlace];
         elements.deliveryPlace.innerHTML = '';
         elements.deliveryPlace.add(new Option('Selecione um local', ''));
 
-        if (places.length === 0) {
-            elements.deliveryPlace.add(new Option('Nenhum local disponível no momento', ''));
-            elements.deliveryPlace.disabled = true;
-            return;
-        }
-
         elements.deliveryPlace.disabled = false;
-        places.forEach(place => {
+        appState.deliveryPlaces.forEach(place => {
             const option = new Option(
-                `${place.name} · Entrega ${utils.formatCurrency(place.fee)}`,
+                place.type === 'pickup'
+                    ? `${place.name} · Grátis`
+                    : `${place.name} · Entrega ${utils.formatCurrency(place.fee)}`,
                 place.id
             );
             elements.deliveryPlace.add(option);
         });
+    },
+
+    updateDeliveryPlaceSelection() {
+        const selectedPlace = appState.deliveryPlaces.find(
+            place => place.id === elements.deliveryPlace.value
+        ) || null;
+        const needsAddress = selectedPlace && selectedPlace.type !== 'pickup';
+
+        appState.selectedDeliveryPlace = selectedPlace;
+        elements.customerAddress.disabled = !needsAddress;
+        elements.customerAddress.required = Boolean(needsAddress);
+        elements.customerAddressGroup.classList.toggle('hidden', !needsAddress);
+
+        if (selectedPlace?.type === 'pickup') {
+            elements.customerAddress.value = '';
+        }
+
+        this.updateCheckoutSummary();
     },
 
     updateCheckoutSummary() {
@@ -605,10 +634,7 @@ const eventHandlers = {
         elements.cartOverlay.addEventListener('click', () => ui.closeCart());
         elements.checkoutBtn.addEventListener('click', () => ui.showCheckoutModal());
         elements.deliveryPlace.addEventListener('change', () => {
-            appState.selectedDeliveryPlace = appState.deliveryPlaces.find(
-                place => place.id === elements.deliveryPlace.value
-            ) || null;
-            ui.updateCheckoutSummary();
+            ui.updateDeliveryPlaceSelection();
         });
         elements.cartItems.addEventListener('click', event => {
             const removeButton = event.target.closest('.cart-item-remove');
@@ -750,14 +776,15 @@ const eventHandlers = {
         );
         const paymentMethod = formData.get('payment');
 
-        if (!customerName || !customerAddress || !paymentMethod) {
-            alert('Por favor, preencha todos os campos obrigatórios.');
-            return;
-        }
-
         if (!deliveryPlace) {
             alert('Selecione um local de entrega disponível.');
             elements.deliveryPlace.focus();
+            return;
+        }
+
+        const needsAddress = deliveryPlace.type !== 'pickup';
+        if (!customerName || (needsAddress && !customerAddress) || !paymentMethod) {
+            alert('Por favor, preencha todos os campos obrigatórios.');
             return;
         }
 
@@ -772,7 +799,9 @@ const eventHandlers = {
             let message = `*Novo Pedido - ${appState.currentUser?.name || 'ConectaZap'}*\n\n`;
             message += `👤 *Cliente:* ${customerName}\n`;
             message += `📍 *Local de entrega:* ${deliveryPlace.name}\n`;
-            message += `🏠 *Endereço:* ${customerAddress}\n`;
+            if (needsAddress) {
+                message += `🏠 *Endereço:* ${customerAddress}\n`;
+            }
             message += `💳 *Pagamento:* ${paymentMethod}\n\n`;
             message += `🛍️ *Produtos:*\n`;
 
