@@ -116,18 +116,6 @@ body {
     padding: var(--spacing-xl);
 }
 
-.loading-logo {
-    display: block;
-    width: min(72vw, 250px);
-    height: 96px;
-    max-height: 112px;
-    object-fit: contain;
-    margin-bottom: 1.25rem;
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-}
 
 .loading-spinner {
     width: 60px;
@@ -163,7 +151,6 @@ body {
     position: sticky;
     top: 0;
     z-index: var(--z-sticky);
-    border-bottom: 1px solid var(--border-color);
 }
 
 .header-container {
@@ -2120,6 +2107,7 @@ body {
     max-width: 960px;
     min-height: 84px;
     padding: 1rem 1.75rem;
+    border-bottom: 2px solid var(--primary-color);
 }
 
 .brand-name {
