@@ -119,6 +119,7 @@ const elements = {
     searchEmpty: document.getElementById('search-empty'),
     brandName: document.querySelector('.brand-name'),
     storeName: document.getElementById('store-name'),
+    storeHeroImage: document.querySelector('.store-hero-image'),
     
     // Categories
     categoriesContainer: document.getElementById('categories'),
@@ -325,6 +326,7 @@ const api = {
                 name: user.nome,
                 phone: user.tel,
                 id: user._id,
+                banner: user.banner || user.bannerUrl || '',
                 color: utils.getSystemColor(user.corSistema)
             };
         } catch (error) {
@@ -866,6 +868,19 @@ const app = {
             if (appState.currentUser) {
                 elements.brandName.textContent = appState.currentUser.name;
                 elements.storeName.textContent = appState.currentUser.name;
+
+                const bannerUrl = typeof appState.currentUser.banner === 'string'
+                    ? appState.currentUser.banner.trim()
+                    : '';
+                elements.storeHeroImage.alt = `Banner de ${appState.currentUser.name}`;
+
+                if (bannerUrl) {
+                    elements.storeHeroImage.src = bannerUrl;
+                    elements.storeHeroImage.classList.remove('hidden');
+                } else {
+                    elements.storeHeroImage.removeAttribute('src');
+                    elements.storeHeroImage.classList.add('hidden');
+                }
             }
 
             appState.deliveryPlaces = await api.fetchDeliveryPlaces(appState.currentUser.id);
