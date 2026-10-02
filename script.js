@@ -125,6 +125,7 @@ const elements = {
     searchClear: document.getElementById('search-clear'),
     searchEmpty: document.getElementById('search-empty'),
     categoryTabs: document.getElementById('category-tabs'),
+    categoryLoading: document.getElementById('category-loading'),
     productsEmpty: document.getElementById('products-empty'),
     brandName: document.querySelector('.brand-name'),
     storeHeroImage: document.querySelector('.store-hero-image'),
@@ -643,7 +644,7 @@ const ui = {
             groupedProducts.get(category._displayId).length > 0
         );
 
-        elements.productsGrid.replaceChildren();
+        elements.productsGrid.replaceChildren(elements.categoryLoading);
         let productIndex = 0;
 
         const renderCategorySection = (categoryId, categoryName, categoryProducts) => {
@@ -965,13 +966,22 @@ const eventHandlers = {
                 tab.setAttribute('aria-pressed', String(isActive));
             });
 
-            ui.filterProducts(elements.searchInput.value);
+            elements.categoryLoading.classList.remove('hidden');
+            elements.categoryLoading.setAttribute('aria-hidden', 'false');
+            elements.productsGrid.setAttribute('aria-busy', 'true');
 
-            if (appState.activeCategoryId !== 'all') {
-                const section = [...elements.productsGrid.querySelectorAll('.product-category-section')]
-                    .find(item => item.dataset.categoryId === appState.activeCategoryId);
-                section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                ui.filterProducts(elements.searchInput.value);
+                elements.categoryLoading.classList.add('hidden');
+                elements.categoryLoading.setAttribute('aria-hidden', 'true');
+                elements.productsGrid.setAttribute('aria-busy', 'false');
+
+                if (appState.activeCategoryId !== 'all') {
+                    const section = [...elements.productsGrid.querySelectorAll('.product-category-section')]
+                        .find(item => item.dataset.categoryId === appState.activeCategoryId);
+                    section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }));
         });
     },
 
