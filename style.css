@@ -2225,8 +2225,9 @@ body {
 .store-hero-image {
     display: block;
     width: 100%;
-    height: auto;
-    object-fit: contain;
+    height: 320px;
+    object-fit: cover;
+    object-position: center;
 }
 
 .products-section {
@@ -2497,6 +2498,10 @@ body {
 
     .store-hero {
         margin-bottom: 1.5rem;
+    }
+
+    .store-hero-image {
+        height: 160px;
     }
 
     .section-title {
