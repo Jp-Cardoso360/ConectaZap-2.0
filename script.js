@@ -512,6 +512,38 @@ const ui = {
         elements.checkoutTotal.textContent = utils.formatCurrency(appState.getCartTotal() + deliveryFee);
     },
 
+    filterProducts(query) {
+        const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR');
+        appState.productQuery = normalizedQuery;
+        const productCards = elements.productsGrid.querySelectorAll('.product-card');
+        let visibleProducts = 0;
+
+        productCards.forEach(card => {
+            const categoryMatches = appState.activeCategoryId === 'all' ||
+                card.dataset.categoryId === appState.activeCategoryId;
+            const matches = categoryMatches && card.dataset.searchText.includes(normalizedQuery);
+            card.classList.toggle('hidden', !matches);
+            if (matches) visibleProducts++;
+        });
+
+        const sections = elements.productsGrid.querySelectorAll('.product-category-section');
+        sections.forEach(section => {
+            const categoryMatches = appState.activeCategoryId === 'all' ||
+                section.dataset.categoryId === appState.activeCategoryId;
+            const sectionCards = [...section.querySelectorAll('.product-card')];
+            const matchingCards = sectionCards.filter(card => !card.classList.contains('hidden')).length;
+            const isEmptyCategory = sectionCards.length === 0;
+            const sectionEmpty = section.querySelector('.category-empty');
+
+            sectionEmpty.classList.toggle('hidden', !isEmptyCategory || normalizedQuery.length > 0);
+            section.classList.toggle('hidden', !categoryMatches || (
+                normalizedQuery.length > 0 && matchingCards === 0
+            ));
+        });
+
+        elements.searchEmpty.classList.toggle('hidden', normalizedQuery.length === 0 || visibleProducts > 0);
+    },
+
     checkGoalAchievement(total) {
         if (appState.userGoal && total >= appState.userGoal && !appState.goalAchieved) {
             appState.goalAchieved = true;
@@ -793,13 +825,13 @@ const eventHandlers = {
                 elements.searchInput.focus();
             } else {
                 elements.searchInput.value = '';
-                this.filterProducts('');
+                ui.filterProducts('');
             }
         });
-        elements.searchInput.addEventListener('input', () => this.filterProducts(elements.searchInput.value));
+        elements.searchInput.addEventListener('input', () => ui.filterProducts(elements.searchInput.value));
         elements.searchClear.addEventListener('click', () => {
             elements.searchInput.value = '';
-            this.filterProducts('');
+            ui.filterProducts('');
             elements.searchInput.focus();
         });
 
@@ -876,7 +908,7 @@ const eventHandlers = {
                 tab.setAttribute('aria-pressed', String(isActive));
             });
 
-            this.filterProducts(elements.searchInput.value);
+            ui.filterProducts(elements.searchInput.value);
 
             if (appState.activeCategoryId !== 'all') {
                 const section = [...elements.productsGrid.querySelectorAll('.product-category-section')]
@@ -884,38 +916,6 @@ const eventHandlers = {
                 section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         });
-    },
-
-    filterProducts(query) {
-        const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR');
-        appState.productQuery = normalizedQuery;
-        const productCards = elements.productsGrid.querySelectorAll('.product-card');
-        let visibleProducts = 0;
-
-        productCards.forEach(card => {
-            const categoryMatches = appState.activeCategoryId === 'all' ||
-                card.dataset.categoryId === appState.activeCategoryId;
-            const matches = categoryMatches && card.dataset.searchText.includes(normalizedQuery);
-            card.classList.toggle('hidden', !matches);
-            if (matches) visibleProducts++;
-        });
-
-        const sections = elements.productsGrid.querySelectorAll('.product-category-section');
-        sections.forEach(section => {
-            const categoryMatches = appState.activeCategoryId === 'all' ||
-                section.dataset.categoryId === appState.activeCategoryId;
-            const sectionCards = [...section.querySelectorAll('.product-card')];
-            const matchingCards = sectionCards.filter(card => !card.classList.contains('hidden')).length;
-            const isEmptyCategory = sectionCards.length === 0;
-            const sectionEmpty = section.querySelector('.category-empty');
-
-            sectionEmpty.classList.toggle('hidden', !isEmptyCategory || normalizedQuery.length > 0);
-            section.classList.toggle('hidden', !categoryMatches || (
-                normalizedQuery.length > 0 && matchingCards === 0
-            ));
-        });
-
-        elements.searchEmpty.classList.toggle('hidden', normalizedQuery.length === 0 || visibleProducts > 0);
     },
 
     async handleCheckoutSubmit(e) {
