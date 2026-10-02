@@ -639,6 +639,9 @@ const ui = {
                 uncategorizedProducts.push(product);
             }
         });
+        const populatedCategories = orderedCategories.filter(category =>
+            groupedProducts.get(category._displayId).length > 0
+        );
 
         elements.productsGrid.replaceChildren();
         let productIndex = 0;
@@ -717,7 +720,7 @@ const ui = {
             elements.productsGrid.appendChild(section);
         };
 
-        orderedCategories.forEach(category => {
+        populatedCategories.forEach(category => {
             renderCategorySection(
                 category._displayId,
                 category._displayName,
@@ -731,9 +734,9 @@ const ui = {
 
         elements.productsEmpty.classList.toggle(
             'hidden',
-            products.length > 0 || orderedCategories.length > 0
+            products.length > 0
         );
-        this.renderCategoryTabs(orderedCategories.map(category => ({
+        this.renderCategoryTabs(populatedCategories.map(category => ({
             id: category._displayId,
             name: category._displayName
         })), uncategorizedProducts.length > 0);
