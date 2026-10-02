@@ -190,6 +190,38 @@ const utils = {
         }).format(value);
     },
 
+    getProductImageUrl(product) {
+        const imageValues = [
+            product?.thumbnail_url,
+            product?.thumbnailUrl,
+            product?.imageUrl,
+            product?.imageURL,
+            product?.image_url,
+            product?.imagemUrl,
+            product?.urlImagem,
+            product?.url_imagem,
+            product?.imagemProduto,
+            product?.imagem_url,
+            product?.imagem,
+            product?.image,
+            product?.imageKitUrl,
+            product?.thumbnail,
+            product?.fotoUrl,
+            product?.foto,
+            product?.photo
+        ];
+
+        for (const value of imageValues) {
+            if (typeof value === 'string' && value.trim()) return value.trim();
+            if (value && typeof value === 'object') {
+                const nestedUrl = value.url || value.src || value.href || value.imageUrl || value.image_url;
+                if (typeof nestedUrl === 'string' && nestedUrl.trim()) return nestedUrl.trim();
+            }
+        }
+
+        return '';
+    },
+
     debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
@@ -442,19 +474,22 @@ const ui = {
             utils.showElement(elements.cartItems);
             
             // Render cart items
-            elements.cartItems.innerHTML = cartItems.map(item => `
-                <div class="cart-item">
-                    <img src="${item.thumbnail_url}" alt="${item.description}" class="cart-item-image">
-                    <div class="cart-item-info">
-                        <div class="cart-item-name">${item.description}</div>
-                        <div class="cart-item-price">${utils.formatCurrency(item.price)}</div>
-                        <div class="cart-item-quantity">Quantidade: ${item.quantity}</div>
+            elements.cartItems.innerHTML = cartItems.map(item => {
+                const imageUrl = utils.getProductImageUrl(item);
+                return `
+                    <div class="cart-item">
+                        <img ${imageUrl ? `src="${imageUrl}"` : ''} alt="${item.description}" class="cart-item-image">
+                        <div class="cart-item-info">
+                            <div class="cart-item-name">${item.description}</div>
+                            <div class="cart-item-price">${utils.formatCurrency(item.price)}</div>
+                            <div class="cart-item-quantity">Quantidade: ${item.quantity}</div>
+                        </div>
+                        <button class="cart-item-remove" type="button" data-product-id="${item._id}" aria-label="Remover ${item.description} do carrinho">
+                            <i class="fas fa-times" aria-hidden="true"></i>
+                        </button>
                     </div>
-                    <button class="cart-item-remove" type="button" data-product-id="${item._id}" aria-label="Remover ${item.description} do carrinho">
-                        <i class="fas fa-times" aria-hidden="true"></i>
-                    </button>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         // Check goal achievement
@@ -628,13 +663,14 @@ const ui = {
             categoryProducts.forEach(product => {
             const productElement = document.createElement('div');
             productElement.className = 'product-card';
+            const imageUrl = utils.getProductImageUrl(product);
             productElement.dataset.categoryId = categoryId;
             productElement.dataset.searchText = `${product.description} ${product.description2 || ''}`.toLocaleLowerCase('pt-BR');
                 productElement.style.animationDelay = `${productIndex++ * CONFIG.ANIMATION_DELAY}ms`;
             
             productElement.innerHTML = `
                 <div class="product-image-container">
-                    <img src="${product.thumbnail_url}" alt="${product.description}" class="product-image" loading="lazy">
+                    <img alt="${product.description}" class="product-image" loading="lazy">
                 </div>
                 <div class="product-content">
                     <h3 class="product-name">${product.description}</h3>
@@ -655,6 +691,18 @@ const ui = {
                     </div>
                 </div>
             `;
+
+            const productImage = productElement.querySelector('.product-image');
+            const imageContainer = productElement.querySelector('.product-image-container');
+            if (imageUrl) {
+                productImage.src = imageUrl;
+                productImage.addEventListener('error', () => {
+                    imageContainer.classList.add('image-unavailable');
+                    productImage.removeAttribute('src');
+                }, { once: true });
+            } else {
+                imageContainer.classList.add('image-unavailable');
+            }
 
             // Add click event for product details
             productElement.addEventListener('click', (e) => {
@@ -739,7 +787,14 @@ const ui = {
         const product = appState.getProduct(productId);
         if (!product) return;
 
-        elements.modalImage.src = product.thumbnail_url;
+        const imageUrl = utils.getProductImageUrl(product);
+        if (imageUrl) {
+            elements.modalImage.src = imageUrl;
+            elements.modalImage.classList.remove('hidden');
+        } else {
+            elements.modalImage.removeAttribute('src');
+            elements.modalImage.classList.add('hidden');
+        }
         elements.modalImage.alt = product.description;
         elements.modalName.textContent = product.description;
         elements.modalPrice.textContent = utils.formatCurrency(product.price);
@@ -1056,7 +1111,7 @@ const app = {
                     _id: product._id,
                     description: product.description,
                     price: product.price,
-                    thumbnail_url: product.thumbnail_url,
+                    thumbnail_url: utils.getProductImageUrl(product),
                     description2: product.description2,
                     categoriaId: product.categoriaId ?? product.categoryId ?? null
                 });
