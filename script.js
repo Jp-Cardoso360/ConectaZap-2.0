@@ -127,7 +127,6 @@ const elements = {
     categoryTabs: document.getElementById('category-tabs'),
     productsEmpty: document.getElementById('products-empty'),
     brandName: document.querySelector('.brand-name'),
-    storeName: document.getElementById('store-name'),
     storeHeroImage: document.querySelector('.store-hero-image'),
     
     // Categories
@@ -1073,12 +1072,9 @@ const app = {
             // Update brand name with user's business name
             if (appState.currentUser) {
                 elements.brandName.textContent = appState.currentUser.name;
-                elements.storeName.textContent = appState.currentUser.name;
-
                 const bannerUrl = typeof appState.currentUser.banner === 'string'
                     ? appState.currentUser.banner.trim()
                     : '';
-                elements.storeHeroImage.alt = `Banner de ${appState.currentUser.name}`;
 
                 if (bannerUrl) {
                     elements.storeHeroImage.src = bannerUrl;

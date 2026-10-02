@@ -2213,66 +2213,20 @@ body {
 
 .store-hero {
     position: relative;
-    min-height: 240px;
-    display: flex;
-    align-items: flex-end;
+    display: block;
     overflow: hidden;
     isolation: isolate;
     margin: 0 0 2rem;
-    border-radius: 1.25rem;
+    border-radius: 1rem;
     background: #30353a;
     box-shadow: var(--shadow-medium);
 }
 
-.store-hero-image,
-.store-hero-shade {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-}
-
 .store-hero-image {
-    z-index: -2;
-    object-fit: cover;
-    object-position: center 45%;
-}
-
-.store-hero-shade {
-    z-index: -1;
-    background: linear-gradient(0deg, rgba(16, 20, 23, 0.82), rgba(16, 20, 23, 0.04) 88%);
-}
-
-.store-hero-content {
+    display: block;
     width: 100%;
-    padding: 1.5rem 1.75rem;
-    color: #fff;
-}
-
-.store-hero-kicker {
-    display: inline-block;
-    margin-bottom: 0.35rem;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    opacity: 0.85;
-}
-
-.store-hero-content h2 {
-    margin-bottom: 0.25rem;
-    font-family: var(--font-primary);
-    font-size: 1.35rem;
-    font-weight: 500;
-    line-height: 1.2;
-    color: #d1d5db;
-    overflow-wrap: anywhere;
-}
-
-.store-hero-content p {
-    max-width: 38rem;
-    font-size: 0.95rem;
-    line-height: 1.45;
-    opacity: 0.92;
+    height: auto;
+    object-fit: contain;
 }
 
 .products-section {
@@ -2542,23 +2496,7 @@ body {
     }
 
     .store-hero {
-        min-height: 0;
-        aspect-ratio: 2.2 / 1;
         margin-bottom: 1.5rem;
-        border-radius: 1rem;
-    }
-
-    .store-hero-content {
-        padding: 1.125rem 1rem;
-    }
-
-    .store-hero-content h2 {
-        font-size: 1.15rem;
-    }
-
-    .store-hero-content p {
-        max-width: 25rem;
-        font-size: 0.875rem;
     }
 
     .section-title {
@@ -2684,14 +2622,6 @@ body {
 }
 
 @media (min-width: 681px) {
-    .store-hero {
-        min-height: 300px;
-    }
-
-    .store-hero-image {
-        object-position: center center;
-    }
-
     .products-grid {
         grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
         max-width: 100%;
