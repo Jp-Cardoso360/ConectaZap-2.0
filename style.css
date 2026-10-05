@@ -2290,11 +2290,7 @@ body {
 }
 
 body.store-suspended {
-    background: #111416;
-}
-
-body.store-suspended > :not(#store-suspended-screen) {
-    display: none !important;
+    overflow: hidden;
 }
 
 .store-suspended-screen {
@@ -2304,8 +2300,7 @@ body.store-suspended > :not(#store-suspended-screen) {
     display: grid;
     place-items: center;
     padding: 1.25rem;
-    background: rgba(10, 12, 14, 0.94);
-    backdrop-filter: blur(5px);
+    background: rgba(0, 0, 0, 0.16);
 }
 
 .store-suspended-screen.hidden {

@@ -495,7 +495,11 @@ const ui = {
 
     showSuspendedStore() {
         document.body.classList.add('store-suspended');
+        [...document.body.children]
+            .filter(child => child !== elements.storeSuspendedScreen)
+            .forEach(child => { child.inert = true; });
         elements.storeSuspendedScreen.classList.remove('hidden');
+        elements.storeSuspendedScreen.focus({ preventScroll: true });
     },
 
     updateCartBadge() {
@@ -1191,13 +1195,8 @@ const app = {
             return;
         }
 
-        if (storeAccount.status === 'suspenso') {
-            ui.showSuspendedStore();
-            ui.hideLoading();
-            return;
-        }
-
-        if (storeAccount.status !== 'ativo') {
+        const isSuspended = storeAccount.status === 'suspenso';
+        if (storeAccount.status !== 'ativo' && !isSuspended) {
             ui.showStoreStatus('Não foi possível confirmar o status da conta. Tente novamente.', { retry: true });
             ui.hideLoading();
             return;
@@ -1242,6 +1241,10 @@ const app = {
         ui.renderProducts(products, appState.categories);
         ui.updateCartBadge();
         ui.updateCartSidebar();
+
+        if (isSuspended) {
+            ui.showSuspendedStore();
+        }
     },
 
     async retryStoreLoad() {
