@@ -62,6 +62,19 @@ class AppState {
         return true;
     }
 
+    updateProductObservation(productId, observation) {
+        const product = this.getProduct(productId);
+        if (!product) return false;
+
+        product.observation = observation;
+        const cartItem = this.cart.get(productId);
+        if (cartItem) {
+            cartItem.observation = observation;
+        }
+        this.saveCartToStorage();
+        return true;
+    }
+
     getCartItems() {
         return Array.from(this.cart.values());
     }
@@ -81,7 +94,10 @@ class AppState {
 
     clearCart() {
         this.cart.clear();
-        this.products.forEach(product => product.quantity = 0);
+        this.products.forEach(product => {
+            product.quantity = 0;
+            product.observation = '';
+        });
         this.saveCartToStorage();
     }
 
@@ -153,6 +169,7 @@ const elements = {
     modalName: document.getElementById('modal-name'),
     modalPrice: document.getElementById('modal-price'),
     modalDescription: document.getElementById('modal-description'),
+    modalObservation: document.getElementById('modal-observation'),
     modalQuantity: document.getElementById('modal-quantity'),
     modalMinus: document.getElementById('modal-minus'),
     modalPlus: document.getElementById('modal-plus'),
@@ -807,6 +824,7 @@ const ui = {
         elements.modalName.textContent = product.description;
         elements.modalPrice.textContent = utils.formatCurrency(product.price);
         elements.modalDescription.textContent = product.description2 || "Sem descrição detalhada disponível.";
+        elements.modalObservation.value = product.observation || '';
         elements.modalQuantity.textContent = product.quantity;
 
         // Store current product ID for modal controls
@@ -931,6 +949,11 @@ const eventHandlers = {
             }
         });
 
+        elements.modalObservation.addEventListener('input', () => {
+            const productId = elements.productModal.dataset.productId;
+            appState.updateProductObservation(productId, elements.modalObservation.value);
+        });
+
         // Checkout form
         elements.checkoutForm.addEventListener('submit', this.handleCheckoutSubmit);
 
@@ -1032,6 +1055,10 @@ const eventHandlers = {
 
             cartItems.forEach(item => {
                 message += `• ${item.description} (${item.quantity}x) - ${utils.formatCurrency(item.price * item.quantity)}\n`;
+                const observation = item.observation?.trim();
+                if (observation) {
+                    message += `  _Observação:_ ${observation.replace(/\r?\n/g, '\n  ')}\n`;
+                }
             });
 
             message += `\n📊 *Resumo:*\n`;
@@ -1136,6 +1163,7 @@ const app = {
                 const product = appState.getProduct(productId);
                 if (product) {
                     product.quantity = item.quantity;
+                    product.observation = item.observation || '';
                 } else {
                     appState.cart.delete(productId);
                 }

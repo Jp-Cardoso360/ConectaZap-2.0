@@ -897,7 +897,8 @@ body {
 }
 
 .form-group input,
-.form-group select {
+.form-group select,
+.form-group textarea {
     padding: var(--spacing-md);
     border: 2px solid var(--border-color);
     border-radius: var(--radius-md);
@@ -906,8 +907,15 @@ body {
     transition: border-color var(--transition-fast);
 }
 
+.form-group textarea {
+    min-height: 88px;
+    resize: vertical;
+    line-height: 1.5;
+}
+
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
     outline: none;
     border-color: var(--primary-color);
 }
