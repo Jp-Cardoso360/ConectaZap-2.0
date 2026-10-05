@@ -365,7 +365,9 @@ const api = {
                 })
                 .map(place => ({
                     id: String(place._id || place.id || place.nome || place.name || ''),
-                    name: String(place.nome || place.name || place.lugar || place.local || '').trim(),
+                    name: String(place.nome || place.name || place.lugar || place.local || '')
+                        .trim()
+                        .replace(/^./u, character => character.toLocaleUpperCase('pt-BR')),
                     fee: Number(place.fee ?? place.taxaEntrega ?? place.taxa_entrega ?? place.taxa ?? place.deliveryFee ?? 0)
                 }))
                 .filter(place => place.id && place.name && Number.isFinite(place.fee) && place.fee >= 0);
