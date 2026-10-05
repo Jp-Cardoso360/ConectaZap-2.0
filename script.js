@@ -1045,26 +1045,26 @@ const eventHandlers = {
 
             // Build WhatsApp message
             let message = `*Novo Pedido - ${appState.currentUser?.name || 'ConectaZap'}*\n\n`;
-            message += `👤 *Cliente:* ${customerName}\n`;
-            message += `📍 *Local de entrega:* ${deliveryPlace.name}\n`;
+            message += `*Cliente:* ${customerName}\n`;
+            message += `*Local de entrega:* ${deliveryPlace.name}\n`;
             if (needsAddress) {
-                message += `🏠 *Endereço:* ${customerAddress}\n`;
+                message += `*Endereço:* ${customerAddress}\n`;
             }
-            message += `💳 *Pagamento:* ${paymentMethod}\n\n`;
-            message += `🛍️ *Produtos:*\n`;
+            message += `*Forma de pagamento:* ${paymentMethod}\n\n`;
+            message += `*Produtos:*\n`;
 
             cartItems.forEach(item => {
-                message += `• ${item.description} (${item.quantity}x) - ${utils.formatCurrency(item.price * item.quantity)}\n`;
-                const observation = item.observation?.trim();
+                message += `- ${item.description} | Quantidade: ${item.quantity} | Subtotal: ${utils.formatCurrency(item.price * item.quantity)}\n`;
+                const observation = (appState.getProduct(item._id)?.observation || item.observation || '').trim();
                 if (observation) {
-                    message += `  _Observação:_ ${observation.replace(/\r?\n/g, '\n  ')}\n`;
+                    message += `  Observação: ${observation.replace(/\r?\n/g, '\n  ')}\n`;
                 }
             });
 
-            message += `\n📊 *Resumo:*\n`;
-            message += `• Total de itens: ${itemCount}\n`;
-            message += `• Taxa de entrega: ${utils.formatCurrency(deliveryFee)}\n`;
-            message += `• *Valor total: ${utils.formatCurrency(total)}*`;
+            message += `\n*Resumo do pedido:*\n`;
+            message += `- Total de itens: ${itemCount}\n`;
+            message += `- Taxa de entrega: ${utils.formatCurrency(deliveryFee)}\n`;
+            message += `*Total: ${utils.formatCurrency(total)}*`;
 
             // Send to WhatsApp
             const whatsappUrl = `https://api.whatsapp.com/send?phone=${appState.currentUser?.phone}&text=${encodeURIComponent(message)}`;
