@@ -147,6 +147,7 @@ const elements = {
     storeStatusMessage: document.getElementById('store-status-message'),
     storeStatusSpinner: document.getElementById('store-status-spinner'),
     storeStatusRetry: document.getElementById('store-status-retry'),
+    storeSuspendedScreen: document.getElementById('store-suspended-screen'),
     brandName: document.querySelector('.brand-name'),
     storeHeroImage: document.querySelector('.store-hero-image'),
     
@@ -490,6 +491,11 @@ const ui = {
     hideStoreStatus() {
         elements.storeStatus.classList.add('hidden');
         elements.productsGrid.classList.remove('hidden');
+    },
+
+    showSuspendedStore() {
+        document.body.classList.add('store-suspended');
+        elements.storeSuspendedScreen.classList.remove('hidden');
     },
 
     updateCartBadge() {
@@ -1186,7 +1192,7 @@ const app = {
         }
 
         if (storeAccount.status === 'suspenso') {
-            ui.showStoreStatus('Esta conta está suspensa. Entre em contato com o suporte.');
+            ui.showSuspendedStore();
             ui.hideLoading();
             return;
         }
