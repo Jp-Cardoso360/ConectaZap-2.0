@@ -1041,30 +1041,31 @@ const eventHandlers = {
             const subtotal = appState.getCartTotal();
             const deliveryFee = deliveryPlace.fee;
             const total = subtotal + deliveryFee;
-            const itemCount = appState.getCartItemCount();
 
             // Build WhatsApp message
-            let message = `*Novo Pedido - ${appState.currentUser?.name || 'ConectaZap'}*\n\n`;
+            const businessName = (appState.currentUser?.name || 'ConectaZap').toLocaleUpperCase('pt-BR');
+            const deliveryLabel = needsAddress ? 'Bairro' : 'Retirada';
+            let message = `*NOVO PEDIDO - ${businessName}*\n\n`;
             message += `*Cliente:* ${customerName}\n`;
-            message += `*Local de entrega:* ${deliveryPlace.name}\n`;
+            message += `*${deliveryLabel}:* ${deliveryPlace.name}\n`;
             if (needsAddress) {
                 message += `*Endereço:* ${customerAddress}\n`;
             }
-            message += `*Forma de pagamento:* ${paymentMethod}\n\n`;
-            message += `*Produtos:*\n`;
+            message += `*Pagamento:* ${paymentMethod}\n\n`;
+            message += `*Itens do Pedido:*\n`;
 
             cartItems.forEach(item => {
-                message += `- ${item.description} | Quantidade: ${item.quantity} | Subtotal: ${utils.formatCurrency(item.price * item.quantity)}\n`;
+                message += `- (${item.quantity}x) ${item.description} - ${utils.formatCurrency(item.price * item.quantity)}\n`;
                 const observation = (appState.getProduct(item._id)?.observation || item.observation || '').trim();
                 if (observation) {
-                    message += `  Observação: ${observation.replace(/\r?\n/g, '\n  ')}\n`;
+                    message += ` _Obs: ${observation.replace(/\r?\n/g, '\n  ')}_\n`;
                 }
             });
 
-            message += `\n*Resumo do pedido:*\n`;
-            message += `- Total de itens: ${itemCount}\n`;
+            message += `\n*Resumo:*\n`;
+            message += `- Subtotal: ${utils.formatCurrency(subtotal)}\n`;
             message += `- Taxa de entrega: ${utils.formatCurrency(deliveryFee)}\n`;
-            message += `*Total: ${utils.formatCurrency(total)}*`;
+            message += `*Valor Total: ${utils.formatCurrency(total)}*`;
 
             // Send to WhatsApp
             const whatsappUrl = `https://api.whatsapp.com/send?phone=${appState.currentUser?.phone}&text=${encodeURIComponent(message)}`;
