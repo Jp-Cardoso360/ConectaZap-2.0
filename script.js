@@ -143,6 +143,10 @@ const elements = {
     categoryTabs: document.getElementById('category-tabs'),
     categoryLoading: document.getElementById('category-loading'),
     productsEmpty: document.getElementById('products-empty'),
+    storeStatus: document.getElementById('store-status'),
+    storeStatusMessage: document.getElementById('store-status-message'),
+    storeStatusSpinner: document.getElementById('store-status-spinner'),
+    storeStatusRetry: document.getElementById('store-status-retry'),
     brandName: document.querySelector('.brand-name'),
     storeHeroImage: document.querySelector('.store-hero-image'),
     
@@ -426,10 +430,8 @@ const api = {
         }
     },
 
-    async fetchUserGoal() {
+    async fetchStoreAccount(userId) {
         try {
-            const urlPath = window.location.pathname;
-            const userId = urlPath.split('/').filter(Boolean).pop();
             const response = await fetch(`${CONFIG.API_BASE_URL}/metas/list`, {
                 headers: { user_id: userId }
             });
@@ -438,13 +440,28 @@ const api = {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             
-            const goals = await response.json();
-            const userGoal = goals.find(goal => goal.user_id === userId);
-            
-            return userGoal ? userGoal.meta : null;
+            const result = await response.json();
+            const records = Array.isArray(result)
+                ? result
+                : result.metas || result.data || result;
+            const account = Array.isArray(records) ? records.find(record => {
+                const ownerId = record.user_id && typeof record.user_id === 'object'
+                    ? record.user_id._id || record.user_id.id
+                    : record.user_id;
+                return ownerId != null && String(ownerId) === String(userId);
+            }) : null;
+
+            if (!account) {
+                throw new Error('No account status record found for this store.');
+            }
+
+            return {
+                status: String(account.status || '').trim().toLocaleLowerCase('pt-BR'),
+                goal: account.meta ?? null
+            };
         } catch (error) {
-            console.error('Error fetching user goal:', error);
-            return null;
+            console.error('Error verifying store account:', error);
+            throw error;
         }
     }
 };
@@ -459,6 +476,20 @@ const ui = {
     hideLoading() {
         appState.isLoading = false;
         elements.loadingScreen.classList.add('hidden');
+    },
+
+    showStoreStatus(message, { loading = false, retry = false } = {}) {
+        elements.storeStatusMessage.textContent = message;
+        elements.storeStatusSpinner.classList.toggle('hidden', !loading);
+        elements.storeStatusRetry.classList.toggle('hidden', !retry);
+        elements.storeStatus.classList.remove('hidden');
+        elements.productsGrid.classList.add('hidden');
+        elements.productsEmpty.classList.add('hidden');
+    },
+
+    hideStoreStatus() {
+        elements.storeStatus.classList.add('hidden');
+        elements.productsGrid.classList.remove('hidden');
     },
 
     updateCartBadge() {
@@ -882,6 +913,7 @@ const eventHandlers = {
         elements.cartClose.addEventListener('click', () => ui.closeCart());
         elements.cartOverlay.addEventListener('click', () => ui.closeCart());
         elements.checkoutBtn.addEventListener('click', () => ui.showCheckoutModal());
+        elements.storeStatusRetry.addEventListener('click', () => app.retryStoreLoad());
         elements.deliveryPlace.addEventListener('change', () => {
             ui.updateDeliveryPlaceSelection();
         });
@@ -1131,67 +1163,87 @@ const app = {
                 }
             }
 
-            appState.categories = await api.fetchCategories(appState.currentUser.id);
-
-            appState.deliveryPlaces = await api.fetchDeliveryPlaces(appState.currentUser.id);
-            ui.renderDeliveryPlaces(appState.deliveryPlaces);
-
-            // Fetch user goal
-            appState.userGoal = await api.fetchUserGoal();
-
-            // Check if goal was already achieved
-            const goalAchieved = localStorage.getItem(CONFIG.GOAL_STORAGE_KEY);
-            if (goalAchieved === 'true') {
-                appState.goalAchieved = true;
-            }
-
-            // Fetch and render products
-            const products = await api.fetchProducts(appState.currentUser.id);
-            
-            products.forEach(product => {
-                appState.addProduct({
-                    _id: product._id,
-                    description: product.description,
-                    price: product.price,
-                    thumbnail_url: utils.getProductImageUrl(product),
-                    description2: product.description2,
-                    categoriaId: product.categoriaId ?? product.categoryId ?? null
-                });
-            });
-
-            // Restore cart quantities from storage
-            appState.cart.forEach((item, productId) => {
-                const product = appState.getProduct(productId);
-                if (product) {
-                    product.quantity = item.quantity;
-                    product.observation = item.observation || '';
-                } else {
-                    appState.cart.delete(productId);
-                }
-            });
-            appState.saveCartToStorage();
-
-            ui.renderProducts(products, appState.categories);
-            ui.updateCartBadge();
-            ui.updateCartSidebar();
-
             ui.hideLoading();
+            await this.loadStoreContent();
 
         } catch (error) {
             console.error('Error initializing app:', error);
             ui.hideLoading();
-            
-            // Show error message
-            elements.productsGrid.innerHTML = `
-                <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
-                    <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
-                    <h3>Erro ao carregar produtos</h3>
-                    <p>Tente recarregar a página ou entre em contato com o suporte.</p>
-                    <button onclick="location.reload()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: var(--primary-color); color: white; border: none; border-radius: 0.5rem; cursor: pointer;">
-                        Recarregar Página
-                    </button>
-                </div>
-            `;
+            ui.showStoreStatus('Não foi possível carregar a loja. Tente novamente.', { retry: true });
+        }
+    },
+
+    async loadStoreContent() {
+        ui.showStoreStatus('Verificando o status da loja...', { loading: true });
+
+        let storeAccount;
+        try {
+            storeAccount = await api.fetchStoreAccount(appState.currentUser.id);
+        } catch (error) {
+            ui.showStoreStatus('Não foi possível verificar o status da conta. Confira sua conexão e tente novamente.', { retry: true });
+            ui.hideLoading();
+            return;
+        }
+
+        if (storeAccount.status === 'suspenso') {
+            ui.showStoreStatus('Esta conta está suspensa. Entre em contato com o suporte.');
+            ui.hideLoading();
+            return;
+        }
+
+        if (storeAccount.status !== 'ativo') {
+            ui.showStoreStatus('Não foi possível confirmar o status da conta. Tente novamente.', { retry: true });
+            ui.hideLoading();
+            return;
+        }
+
+        ui.showStoreStatus('Loja verificada. Carregando produtos...', { loading: true });
+        appState.userGoal = storeAccount.goal;
+        appState.categories = await api.fetchCategories(appState.currentUser.id);
+
+        appState.deliveryPlaces = await api.fetchDeliveryPlaces(appState.currentUser.id);
+        ui.renderDeliveryPlaces(appState.deliveryPlaces);
+
+        if (localStorage.getItem(CONFIG.GOAL_STORAGE_KEY) === 'true') {
+            appState.goalAchieved = true;
+        }
+
+        const products = await api.fetchProducts(appState.currentUser.id);
+
+        products.forEach(product => {
+            appState.addProduct({
+                _id: product._id,
+                description: product.description,
+                price: product.price,
+                thumbnail_url: utils.getProductImageUrl(product),
+                description2: product.description2,
+                categoriaId: product.categoriaId ?? product.categoryId ?? null
+            });
+        });
+
+        appState.cart.forEach((item, productId) => {
+            const product = appState.getProduct(productId);
+            if (product) {
+                product.quantity = item.quantity;
+                product.observation = item.observation || '';
+            } else {
+                appState.cart.delete(productId);
+            }
+        });
+        appState.saveCartToStorage();
+
+        ui.hideStoreStatus();
+        ui.renderProducts(products, appState.categories);
+        ui.updateCartBadge();
+        ui.updateCartSidebar();
+    },
+
+    async retryStoreLoad() {
+        try {
+            await this.loadStoreContent();
+        } catch (error) {
+            console.error('Error loading store content:', error);
+            ui.showStoreStatus('Não foi possível carregar a loja. Tente novamente.', { retry: true });
         }
     }
 };

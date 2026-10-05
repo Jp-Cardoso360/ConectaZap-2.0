@@ -79,6 +79,11 @@
         <section class="products-section">
             <div class="products-container">
                 <h2 class="section-title">Nossos Produtos</h2>
+                <div class="store-status hidden" id="store-status" role="status" aria-live="polite">
+                    <span class="store-status-spinner hidden" id="store-status-spinner" aria-hidden="true"></span>
+                    <p id="store-status-message"></p>
+                    <button class="store-status-retry hidden" id="store-status-retry" type="button">Tentar novamente</button>
+                </div>
                 <div class="products-grid" id="products-grid">
                     <div class="category-loading hidden" id="category-loading" role="status" aria-label="Carregando produtos" aria-hidden="true">
                         <span class="category-loading-spinner" aria-hidden="true"></span>
