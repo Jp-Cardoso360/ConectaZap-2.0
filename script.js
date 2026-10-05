@@ -366,7 +366,7 @@ const api = {
                 .map(place => ({
                     id: String(place._id || place.id || place.nome || place.name || ''),
                     name: String(place.nome || place.name || place.lugar || place.local || '').trim(),
-                    fee: Number(place.taxaEntrega ?? place.taxa_entrega ?? place.taxa ?? place.deliveryFee ?? 0)
+                    fee: Number(place.fee ?? place.taxaEntrega ?? place.taxa_entrega ?? place.taxa ?? place.deliveryFee ?? 0)
                 }))
                 .filter(place => place.id && place.name && Number.isFinite(place.fee) && place.fee >= 0);
         } catch (error) {
@@ -503,7 +503,10 @@ const ui = {
             fee: 0,
             type: 'pickup'
         };
-        appState.deliveryPlaces = [...places, pickupPlace];
+        const sortedPlaces = [...places].sort((first, second) =>
+            first.name.localeCompare(second.name, 'pt-BR', { sensitivity: 'base' })
+        );
+        appState.deliveryPlaces = [pickupPlace, ...sortedPlaces];
         elements.deliveryPlace.innerHTML = '';
         elements.deliveryPlace.add(new Option('Selecione um local', ''));
 
