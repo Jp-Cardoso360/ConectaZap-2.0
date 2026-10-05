@@ -1202,18 +1202,18 @@ const app = {
             return;
         }
 
-        ui.showStoreStatus('Loja verificada. Carregando produtos...', { loading: true });
+        ui.showStoreStatus('Carregando produtos...', { loading: true });
         appState.userGoal = storeAccount.goal;
-        appState.categories = await api.fetchCategories(appState.currentUser.id);
-
-        appState.deliveryPlaces = await api.fetchDeliveryPlaces(appState.currentUser.id);
-        ui.renderDeliveryPlaces(appState.deliveryPlaces);
+        appState.categories = [];
+        const userId = appState.currentUser.id;
+        const categoriesPromise = api.fetchCategories(userId);
+        const deliveryPlacesPromise = api.fetchDeliveryPlaces(userId);
 
         if (localStorage.getItem(CONFIG.GOAL_STORAGE_KEY) === 'true') {
             appState.goalAchieved = true;
         }
 
-        const products = await api.fetchProducts(appState.currentUser.id);
+        const products = await api.fetchProducts(userId);
 
         products.forEach(product => {
             appState.addProduct({
@@ -1238,13 +1238,22 @@ const app = {
         appState.saveCartToStorage();
 
         ui.hideStoreStatus();
-        ui.renderProducts(products, appState.categories);
+        ui.renderProducts(products);
         ui.updateCartBadge();
         ui.updateCartSidebar();
 
         if (isSuspended) {
             ui.showSuspendedStore();
         }
+
+        const [categories, deliveryPlaces] = await Promise.all([
+            categoriesPromise,
+            deliveryPlacesPromise
+        ]);
+        appState.categories = categories;
+        appState.deliveryPlaces = deliveryPlaces;
+        ui.renderDeliveryPlaces(appState.deliveryPlaces);
+        ui.renderProducts(products, appState.categories);
     },
 
     async retryStoreLoad() {
