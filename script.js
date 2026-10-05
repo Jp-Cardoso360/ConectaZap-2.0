@@ -517,7 +517,7 @@ const ui = {
             const option = new Option(
                 place.type === 'pickup'
                     ? `${place.name} · Grátis`
-                    : `${place.name} · Entrega ${utils.formatCurrency(place.fee)}`,
+                    : `${place.name} · ${utils.formatCurrency(place.fee)}`,
                 place.id
             );
             elements.deliveryPlace.add(option);
