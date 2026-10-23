@@ -17,6 +17,7 @@ class AppState {
         this.products = new Map();
         this.cart = new Map();
         this.currentUser = null;
+        this.storeSlug = null;
         this.userGoal = null;
         this.deliveryPlaces = [];
         this.selectedDeliveryPlace = null;
@@ -244,6 +245,19 @@ const utils = {
         return '';
     },
 
+    getStoreSlug() {
+        const segments = window.location.pathname.split('/').filter(segment => segment.trim());
+        const lastSegment = segments.pop();
+        if (!lastSegment) return '';
+
+        try {
+            return decodeURIComponent(lastSegment).trim();
+        } catch (error) {
+            console.warn('Invalid store slug encoding in URL:', error);
+            return lastSegment.trim();
+        }
+    },
+
     debounce(func, wait) {
         let timeout;
         return function executedFunction(...args) {
@@ -308,26 +322,26 @@ const utils = {
 
 // ===== API FUNCTIONS =====
 const api = {
-    async fetchProducts(userId) {
+    async fetchMenuBySlug(slug) {
         try {
-            const response = await fetch(`${CONFIG.API_BASE_URL}/produto/${encodeURIComponent(userId)}`, {
-                mode: 'cors',
-                headers: { user_id: userId }
-            });
-            
+            const response = await fetch(
+                `${CONFIG.API_BASE_URL}/cardapio/${encodeURIComponent(slug)}`
+            );
+
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const error = new Error(`HTTP error! status: ${response.status}`);
+                error.status = response.status;
+                throw error;
             }
-            
+
             const result = await response.json();
-            const products = Array.isArray(result)
-                ? result
-                : result.produtos || result.products || result.data || [];
-            return Array.isArray(products)
-                ? products.filter(product => product.status === true)
-                : [];
+            if (!result || !result.loja || !Array.isArray(result.produtos)) {
+                throw new Error('A resposta do cardápio não contém loja e produtos válidos.');
+            }
+
+            return result;
         } catch (error) {
-            console.error('Error fetching products:', error);
+            console.error('Error fetching store menu:', error);
             throw error;
         }
     },
@@ -399,72 +413,6 @@ const api = {
         }
     },
 
-    async fetchUserData() {
-        try {
-            const urlPath = window.location.pathname;
-            const userId = urlPath.split('/').filter(Boolean).pop();
-            const response = await fetch(`${CONFIG.API_BASE_URL}/sessions-list-counts`, {
-                headers: { user_id: userId }
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const users = await response.json();
-            const user = users.find(user => user._id === userId);
-            
-            if (!user) {
-                throw new Error("User not found!");
-            }
-            
-            return {
-                name: user.nome,
-                phone: user.tel,
-                id: user._id,
-                banner: user.banner || user.bannerUrl || '',
-                color: utils.getSystemColor(user.corSistema)
-            };
-        } catch (error) {
-            console.error('Error fetching user data:', error);
-            throw error;
-        }
-    },
-
-    async fetchStoreAccount(userId) {
-        try {
-            const response = await fetch(`${CONFIG.API_BASE_URL}/metas/list`, {
-                headers: { user_id: userId }
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const result = await response.json();
-            const records = Array.isArray(result)
-                ? result
-                : result.metas || result.data || result;
-            const account = Array.isArray(records) ? records.find(record => {
-                const ownerId = record.user_id && typeof record.user_id === 'object'
-                    ? record.user_id._id || record.user_id.id
-                    : record.user_id;
-                return ownerId != null && String(ownerId) === String(userId);
-            }) : null;
-
-            if (!account) {
-                throw new Error('No account status record found for this store.');
-            }
-
-            return {
-                status: String(account.status || '').trim().toLocaleLowerCase('pt-BR'),
-                goal: account.meta ?? null
-            };
-        } catch (error) {
-            console.error('Error verifying store account:', error);
-            throw error;
-        }
-    }
 };
 
 // ===== UI FUNCTIONS =====
@@ -532,24 +480,47 @@ const ui = {
         } else {
             utils.hideElement(elements.cartEmpty);
             utils.showElement(elements.cartItems);
-            
-            // Render cart items
-            elements.cartItems.innerHTML = cartItems.map(item => {
+
+            elements.cartItems.replaceChildren();
+            cartItems.forEach(item => {
                 const imageUrl = utils.getProductImageUrl(item);
-                return `
-                    <div class="cart-item">
-                        <img ${imageUrl ? `src="${imageUrl}"` : ''} alt="${item.description}" class="cart-item-image">
-                        <div class="cart-item-info">
-                            <div class="cart-item-name">${item.description}</div>
-                            <div class="cart-item-price">${utils.formatCurrency(item.price)}</div>
-                            <div class="cart-item-quantity">Quantidade: ${item.quantity}</div>
-                        </div>
-                        <button class="cart-item-remove" type="button" data-product-id="${item._id}" aria-label="Remover ${item.description} do carrinho">
-                            <i class="fas fa-times" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                `;
-            }).join('');
+                const cartItem = document.createElement('div');
+                cartItem.className = 'cart-item';
+
+                const image = document.createElement('img');
+                image.className = 'cart-item-image';
+                image.alt = item.description;
+                if (imageUrl) image.src = imageUrl;
+
+                const info = document.createElement('div');
+                info.className = 'cart-item-info';
+                const name = document.createElement('div');
+                name.className = 'cart-item-name';
+                name.textContent = item.description;
+                const price = document.createElement('div');
+                price.className = 'cart-item-price';
+                price.textContent = utils.formatCurrency(item.price);
+                const quantity = document.createElement('div');
+                quantity.className = 'cart-item-quantity';
+                quantity.textContent = `Quantidade: ${item.quantity}`;
+                info.append(name, price, quantity);
+
+                const removeButton = document.createElement('button');
+                removeButton.type = 'button';
+                removeButton.className = 'cart-item-remove';
+                removeButton.dataset.productId = item._id;
+                removeButton.setAttribute(
+                    'aria-label',
+                    `Remover ${item.description} do carrinho`
+                );
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-times';
+                icon.setAttribute('aria-hidden', 'true');
+                removeButton.appendChild(icon);
+
+                cartItem.append(image, info, removeButton);
+                elements.cartItems.appendChild(cartItem);
+            });
         }
 
         // Check goal achievement
@@ -727,55 +698,85 @@ const ui = {
             productGrid.className = 'category-products-grid';
 
             categoryProducts.forEach(product => {
-            const productElement = document.createElement('div');
-            productElement.className = 'product-card';
-            const imageUrl = utils.getProductImageUrl(product);
-            productElement.dataset.categoryId = categoryId;
-            productElement.dataset.searchText = `${product.description} ${product.description2 || ''}`.toLocaleLowerCase('pt-BR');
-                productElement.style.animationDelay = `${productIndex++ * CONFIG.ANIMATION_DELAY}ms`;
-            
-            productElement.innerHTML = `
-                <div class="product-image-container">
-                    <img alt="${product.description}" class="product-image" loading="lazy">
-                </div>
-                <div class="product-content">
-                    <h3 class="product-name">${product.description}</h3>
-                    <p class="product-description">${product.description2 || ''}</p>
-                    <div class="product-purchase-row">
-                        <div class="product-price">${utils.formatCurrency(product.price)}</div>
-                        <div class="product-controls">
-                            <div class="quantity-controls">
-                                <button class="quantity-btn minus" data-product-id="${product._id}" data-action="decrease" aria-label="Diminuir quantidade">
-                                    <i class="fas fa-minus" aria-hidden="true"></i>
-                                </button>
-                                <span class="quantity-display" id="quantity-${product._id}">0</span>
-                                <button class="quantity-btn plus" data-product-id="${product._id}" data-action="increase" aria-label="Aumentar quantidade">
-                                    <i class="fas fa-plus" aria-hidden="true"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
+                const productElement = document.createElement('div');
+                productElement.className = 'product-card';
+                productElement.dataset.categoryId = categoryId;
+                productElement.dataset.searchText =
+                    `${product.description} ${product.description2 || ''}`.toLocaleLowerCase('pt-BR');
+                productElement.style.animationDelay =
+                    `${productIndex++ * CONFIG.ANIMATION_DELAY}ms`;
 
-            const productImage = productElement.querySelector('.product-image');
-            const imageContainer = productElement.querySelector('.product-image-container');
-            if (imageUrl) {
-                productImage.src = imageUrl;
-                productImage.addEventListener('error', () => {
+                const imageContainer = document.createElement('div');
+                imageContainer.className = 'product-image-container';
+                const productImage = document.createElement('img');
+                productImage.alt = product.description;
+                productImage.className = 'product-image';
+                productImage.loading = 'lazy';
+                const imageUrl = utils.getProductImageUrl(product);
+                if (imageUrl) {
+                    productImage.src = imageUrl;
+                    productImage.addEventListener('error', () => {
+                        imageContainer.classList.add('image-unavailable');
+                        productImage.removeAttribute('src');
+                    }, { once: true });
+                } else {
                     imageContainer.classList.add('image-unavailable');
-                    productImage.removeAttribute('src');
-                }, { once: true });
-            } else {
-                imageContainer.classList.add('image-unavailable');
-            }
-
-            // Add click event for product details
-            productElement.addEventListener('click', (e) => {
-                if (!e.target.closest('.quantity-controls')) {
-                    this.showProductModal(product._id);
                 }
-            });
+                imageContainer.appendChild(productImage);
+
+                const content = document.createElement('div');
+                content.className = 'product-content';
+                const name = document.createElement('h3');
+                name.className = 'product-name';
+                name.textContent = product.description;
+                const description = document.createElement('p');
+                description.className = 'product-description';
+                description.textContent = product.description2 || '';
+
+                const purchaseRow = document.createElement('div');
+                purchaseRow.className = 'product-purchase-row';
+                const price = document.createElement('div');
+                price.className = 'product-price';
+                price.textContent = utils.formatCurrency(product.price);
+
+                const controls = document.createElement('div');
+                controls.className = 'product-controls';
+                const quantityControls = document.createElement('div');
+                quantityControls.className = 'quantity-controls';
+                ['decrease', 'increase'].forEach(action => {
+                    if (action === 'increase') {
+                        const quantity = document.createElement('span');
+                        quantity.className = 'quantity-display';
+                        quantity.id = `quantity-${product._id}`;
+                        quantity.textContent = product.quantity;
+                        quantityControls.appendChild(quantity);
+                    }
+
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = `quantity-btn ${action === 'increase' ? 'plus' : 'minus'}`;
+                    button.dataset.productId = product._id;
+                    button.dataset.action = action;
+                    button.setAttribute(
+                        'aria-label',
+                        action === 'increase' ? 'Aumentar quantidade' : 'Diminuir quantidade'
+                    );
+                    const icon = document.createElement('i');
+                    icon.className = `fas fa-${action === 'increase' ? 'plus' : 'minus'}`;
+                    icon.setAttribute('aria-hidden', 'true');
+                    button.appendChild(icon);
+                    quantityControls.appendChild(button);
+                });
+                controls.appendChild(quantityControls);
+                purchaseRow.append(price, controls);
+                content.append(name, description, purchaseRow);
+                productElement.append(imageContainer, content);
+
+                productElement.addEventListener('click', event => {
+                    if (!event.target.closest('.quantity-controls')) {
+                        this.showProductModal(product._id);
+                    }
+                });
 
                 productGrid.appendChild(productElement);
             });
@@ -1138,131 +1139,132 @@ const eventHandlers = {
 // ===== INITIALIZATION =====
 const app = {
     async init() {
-        try {
-            ui.showLoading();
+        ui.showLoading();
+        eventHandlers.init();
 
-            // Initialize event handlers
-            eventHandlers.init();
+        appState.storeSlug = utils.getStoreSlug();
+        ui.hideLoading();
 
-            // Fetch user data
-            appState.currentUser = await api.fetchUserData();
-            appState.loadCartFromStorage();
-
-            document.documentElement.style.setProperty(
-                '--system-primary-color',
-                appState.currentUser.color
-            );
-            document.documentElement.style.setProperty(
-                '--system-primary-hover-color',
-                utils.getDarkerSystemColor(appState.currentUser.color)
-            );
-            
-            // Update brand name with user's business name
-            if (appState.currentUser) {
-                elements.brandName.textContent = appState.currentUser.name;
-                const bannerUrl = typeof appState.currentUser.banner === 'string'
-                    ? appState.currentUser.banner.trim()
-                    : '';
-
-                if (bannerUrl) {
-                    elements.storeHeroImage.src = bannerUrl;
-                    elements.storeHeroImage.classList.remove('hidden');
-                } else {
-                    elements.storeHeroImage.removeAttribute('src');
-                    elements.storeHeroImage.classList.add('hidden');
-                }
-            }
-
-            ui.hideLoading();
-            await this.loadStoreContent();
-
-        } catch (error) {
-            console.error('Error initializing app:', error);
-            ui.hideLoading();
-            ui.showStoreStatus('Não foi possível carregar a loja. Tente novamente.', { retry: true });
+        if (!appState.storeSlug) {
+            ui.showStoreStatus('Acesse o cardápio pelo link da loja para ver os produtos.');
+            return;
         }
+
+        await this.loadStoreContent();
     },
 
     async loadStoreContent() {
-        ui.showStoreStatus('Verificando o status da loja...', { loading: true });
-
-        let storeAccount;
         try {
-            storeAccount = await api.fetchStoreAccount(appState.currentUser.id);
-        } catch (error) {
-            ui.showStoreStatus('Não foi possível verificar o status da conta. Confira sua conexão e tente novamente.', { retry: true });
-            ui.hideLoading();
-            return;
-        }
+            ui.showStoreStatus('Carregando cardápio...', { loading: true });
+            const { loja, produtos } = await api.fetchMenuBySlug(appState.storeSlug);
+            const storeId = loja._id ?? loja.id ?? loja.user_id ?? appState.storeSlug;
+            const color = utils.getSystemColor(
+                loja.corSistema ?? loja.systemColor ?? loja.color
+            );
 
-        const isSuspended = storeAccount.status === 'suspenso';
-        if (storeAccount.status !== 'ativo' && !isSuspended) {
-            ui.showStoreStatus('Não foi possível confirmar o status da conta. Tente novamente.', { retry: true });
-            ui.hideLoading();
-            return;
-        }
+            appState.currentUser = {
+                id: String(storeId),
+                name: String(loja.nome ?? loja.name ?? loja.razaoSocial ?? 'Loja'),
+                phone: String(loja.tel ?? loja.telefone ?? loja.phone ?? ''),
+                banner: loja.banner ?? loja.bannerUrl ?? loja.banner_url ?? '',
+                color
+            };
+            appState.userGoal = loja.meta ?? loja.goal ?? loja.objetivo ?? null;
+            appState.categories = [];
+            appState.products.clear();
+            appState.loadCartFromStorage();
 
-        ui.showStoreStatus('Carregando produtos...', { loading: true });
-        appState.userGoal = storeAccount.goal;
-        appState.categories = [];
-        const userId = appState.currentUser.id;
-        const categoriesPromise = api.fetchCategories(userId);
-        const deliveryPlacesPromise = api.fetchDeliveryPlaces(userId);
+            document.documentElement.style.setProperty('--system-primary-color', color);
+            document.documentElement.style.setProperty(
+                '--system-primary-hover-color',
+                utils.getDarkerSystemColor(color)
+            );
+            elements.brandName.textContent = appState.currentUser.name;
 
-        if (localStorage.getItem(CONFIG.GOAL_STORAGE_KEY) === 'true') {
-            appState.goalAchieved = true;
-        }
-
-        const products = await api.fetchProducts(userId);
-
-        products.forEach(product => {
-            appState.addProduct({
-                _id: product._id,
-                description: product.description,
-                price: product.price,
-                thumbnail_url: utils.getProductImageUrl(product),
-                description2: product.description2,
-                categoriaId: product.categoriaId ?? product.categoryId ?? null
-            });
-        });
-
-        appState.cart.forEach((item, productId) => {
-            const product = appState.getProduct(productId);
-            if (product) {
-                product.quantity = item.quantity;
-                product.observation = item.observation || '';
+            const bannerUrl = typeof appState.currentUser.banner === 'string'
+                ? appState.currentUser.banner.trim()
+                : '';
+            if (bannerUrl) {
+                elements.storeHeroImage.src = bannerUrl;
+                elements.storeHeroImage.classList.remove('hidden');
             } else {
-                appState.cart.delete(productId);
+                elements.storeHeroImage.removeAttribute('src');
+                elements.storeHeroImage.classList.add('hidden');
             }
-        });
-        appState.saveCartToStorage();
 
-        ui.hideStoreStatus();
-        ui.renderProducts(products);
-        ui.updateCartBadge();
-        ui.updateCartSidebar();
+            const products = produtos.map((product, index) => {
+                const id = product._id ?? product.id;
+                const description = product.description ?? product.nome ?? product.name;
+                const price = Number(
+                    product.price ?? product.preco ?? product.precoBase ?? product.preco_base
+                );
+                if (id == null || !String(description || '').trim() || !Number.isFinite(price)) {
+                    throw new Error(`Produto inválido na resposta do cardápio (posição ${index + 1}).`);
+                }
 
-        if (isSuspended) {
-            ui.showSuspendedStore();
+                return {
+                    ...product,
+                    _id: String(id),
+                    description: String(description),
+                    price,
+                    description2: String(
+                        product.description2 ?? product.descricao ?? product.description ?? ''
+                    ),
+                    thumbnail_url: utils.getProductImageUrl(product),
+                    categoriaId: product.categoriaId ?? product.categoryId ?? null
+                };
+            });
+
+            products.forEach(product => appState.addProduct(product));
+            appState.cart.forEach((item, productId) => {
+                const product = appState.getProduct(productId);
+                if (product) {
+                    product.quantity = item.quantity;
+                    product.observation = item.observation || '';
+                } else {
+                    appState.cart.delete(productId);
+                }
+            });
+            appState.saveCartToStorage();
+
+            const categoriesPromise = api.fetchCategories(String(storeId));
+            const deliveryPlacesPromise = api.fetchDeliveryPlaces(String(storeId));
+            if (localStorage.getItem(CONFIG.GOAL_STORAGE_KEY) === 'true') {
+                appState.goalAchieved = true;
+            }
+
+            ui.hideStoreStatus();
+            ui.renderProducts(products);
+            ui.updateCartBadge();
+            ui.updateCartSidebar();
+
+            if (String(loja.status || '').trim().toLocaleLowerCase('pt-BR') === 'suspenso') {
+                ui.showSuspendedStore();
+            }
+
+            const [categories, deliveryPlaces] = await Promise.all([
+                categoriesPromise,
+                deliveryPlacesPromise
+            ]);
+            appState.categories = categories;
+            appState.deliveryPlaces = deliveryPlaces;
+            ui.renderDeliveryPlaces(appState.deliveryPlaces);
+            ui.renderProducts(products, appState.categories);
+        } catch (error) {
+            console.error('Error loading store menu:', error);
+            if (error.status === 404) {
+                ui.showStoreStatus('Este estabelecimento não existe ou o link está incorreto.');
+                return;
+            }
+
+            ui.showStoreStatus('Não foi possível carregar o cardápio. Confira sua conexão e tente novamente.', {
+                retry: true
+            });
         }
-
-        const [categories, deliveryPlaces] = await Promise.all([
-            categoriesPromise,
-            deliveryPlacesPromise
-        ]);
-        appState.categories = categories;
-        appState.deliveryPlaces = deliveryPlaces;
-        ui.renderDeliveryPlaces(appState.deliveryPlaces);
-        ui.renderProducts(products, appState.categories);
     },
 
     async retryStoreLoad() {
-        try {
-            await this.loadStoreContent();
-        } catch (error) {
-            console.error('Error loading store content:', error);
-            ui.showStoreStatus('Não foi possível carregar a loja. Tente novamente.', { retry: true });
-        }
+        await this.loadStoreContent();
     }
 };
 
@@ -1280,4 +1282,3 @@ if (typeof window !== 'undefined') {
         utils
     };
 }
-
