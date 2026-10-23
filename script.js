@@ -413,6 +413,43 @@ const api = {
         }
     },
 
+    async fetchStoreAccount(userId) {
+        try {
+            const response = await fetch(`${CONFIG.API_BASE_URL}/metas/list`, {
+                headers: { user_id: userId }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            const records = Array.isArray(result)
+                ? result
+                : result.metas || result.data || result;
+            const account = Array.isArray(records)
+                ? records.find(record => {
+                    const ownerId = record.user_id && typeof record.user_id === 'object'
+                        ? record.user_id._id || record.user_id.id
+                        : record.user_id;
+                    return ownerId != null && String(ownerId) === String(userId);
+                })
+                : null;
+
+            if (!account) {
+                throw new Error('No account status record found for this store.');
+            }
+
+            return {
+                status: account.status,
+                goal: account.meta ?? null
+            };
+        } catch (error) {
+            console.error('Error verifying store account:', error);
+            throw error;
+        }
+    },
+
 };
 
 // ===== UI FUNCTIONS =====
@@ -1158,7 +1195,37 @@ const app = {
             ui.showLoading();
             ui.showStoreStatus('Carregando cardápio...', { loading: true });
             const { loja, produtos } = await api.fetchMenuBySlug(appState.storeSlug);
-            const storeId = loja._id ?? loja.id ?? loja.user_id ?? appState.storeSlug;
+            const storeId = loja.user_id ?? loja.userId ?? loja._id ?? loja.id ?? appState.storeSlug;
+            const storeAccount = await api.fetchStoreAccount(String(storeId));
+            const normalizeStatus = status => String(status ?? '')
+                .trim()
+                .toLocaleLowerCase('pt-BR')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '');
+            const accountStatus = normalizeStatus(storeAccount.status);
+            const statusValues = [
+                storeAccount.status,
+                loja.status,
+                loja.statusConta,
+                loja.status_conta
+            ];
+            const isSuspended = statusValues.some(status => {
+                if (status === false) return true;
+                const normalizedStatus = normalizeStatus(status);
+                return ['suspenso', 'suspensa', 'suspended'].includes(normalizedStatus);
+            });
+
+            if (isSuspended) {
+                ui.hideLoading();
+                ui.hideStoreStatus();
+                ui.showSuspendedStore();
+                return;
+            }
+
+            if (!['ativo', 'active'].includes(accountStatus)) {
+                throw new Error(`Unexpected store account status: ${storeAccount.status}`);
+            }
+
             const color = utils.getSystemColor(
                 loja.corSistema ?? loja.systemColor ?? loja.color
             );
@@ -1170,7 +1237,7 @@ const app = {
                 banner: loja.banner ?? loja.bannerUrl ?? loja.banner_url ?? '',
                 color
             };
-            appState.userGoal = loja.meta ?? loja.goal ?? loja.objetivo ?? null;
+            appState.userGoal = storeAccount.goal ?? loja.meta ?? loja.goal ?? loja.objetivo ?? null;
             appState.categories = [];
             appState.products.clear();
             appState.loadCartFromStorage();
@@ -1247,10 +1314,6 @@ const app = {
             ui.updateCartSidebar();
             ui.hideStoreStatus();
             ui.hideLoading();
-
-            if (String(loja.status || '').trim().toLocaleLowerCase('pt-BR') === 'suspenso') {
-                ui.showSuspendedStore();
-            }
         } catch (error) {
             console.error('Error loading store menu:', error);
             ui.hideLoading();
