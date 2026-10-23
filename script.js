@@ -1143,9 +1143,9 @@ const app = {
         eventHandlers.init();
 
         appState.storeSlug = utils.getStoreSlug();
-        ui.hideLoading();
 
         if (!appState.storeSlug) {
+            ui.hideLoading();
             ui.showStoreStatus('Acesse o cardápio pelo link da loja para ver os produtos.');
             return;
         }
@@ -1155,6 +1155,7 @@ const app = {
 
     async loadStoreContent() {
         try {
+            ui.showLoading();
             ui.showStoreStatus('Carregando cardápio...', { loading: true });
             const { loja, produtos } = await api.fetchMenuBySlug(appState.storeSlug);
             const storeId = loja._id ?? loja.id ?? loja.user_id ?? appState.storeSlug;
@@ -1233,15 +1234,6 @@ const app = {
                 appState.goalAchieved = true;
             }
 
-            ui.hideStoreStatus();
-            ui.renderProducts(products);
-            ui.updateCartBadge();
-            ui.updateCartSidebar();
-
-            if (String(loja.status || '').trim().toLocaleLowerCase('pt-BR') === 'suspenso') {
-                ui.showSuspendedStore();
-            }
-
             const [categories, deliveryPlaces] = await Promise.all([
                 categoriesPromise,
                 deliveryPlacesPromise
@@ -1250,8 +1242,18 @@ const app = {
             appState.deliveryPlaces = deliveryPlaces;
             ui.renderDeliveryPlaces(appState.deliveryPlaces);
             ui.renderProducts(products, appState.categories);
+
+            ui.updateCartBadge();
+            ui.updateCartSidebar();
+            ui.hideStoreStatus();
+            ui.hideLoading();
+
+            if (String(loja.status || '').trim().toLocaleLowerCase('pt-BR') === 'suspenso') {
+                ui.showSuspendedStore();
+            }
         } catch (error) {
             console.error('Error loading store menu:', error);
+            ui.hideLoading();
             if (error.status === 404) {
                 ui.showStoreStatus('Este estabelecimento não existe ou o link está incorreto.');
                 return;
