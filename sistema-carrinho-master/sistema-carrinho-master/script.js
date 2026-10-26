@@ -246,35 +246,44 @@ const api = {
         }
     },
 
-    async fetchUserData() {
-        try {
-            const response = await fetch(`${CONFIG.API_BASE_URL}/sessions-list-counts`);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const users = await response.json();
-            const urlPath = window.location.pathname;
-            const userId = urlPath.split("/").pop();
-            
-            const user = users.find(user => user._id === userId);
-            
-            if (!user) {
-                throw new Error("User not found!");
-            }
-            
-            return {
-                name: user.nome,
-                phone: user.tel,
-                id: user._id,
-                color: utils.getSystemColor(user.corSistema)
-            };
-        } catch (error) {
-            console.error('Error fetching user data:', error);
-            throw error;
+
+async fetchUserData() {
+    try {
+        const slug = window.location.pathname
+            .split("/")
+            .filter(Boolean)
+            .pop();
+
+        if (!slug) {
+            throw new Error("Slug da loja não encontrado!");
         }
-    },
+
+        const response = await fetch(
+            `${CONFIG.API_BASE_URL}/users/slug/${encodeURIComponent(slug)}`
+        );
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const user = data.user;
+
+        if (!user) {
+            throw new Error("User not found!");
+        }
+
+        return {
+            name: user.nome,
+            phone: user.tel,
+            id: user._id,
+            color: utils.getSystemColor(user.corSistema)
+        };
+    } catch (error) {
+        console.error("Error fetching user data:", error);
+        throw error;
+    }
+},
 
     async fetchUserGoal() {
         try {
