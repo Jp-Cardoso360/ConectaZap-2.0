@@ -384,7 +384,7 @@ const ui = {
             
             productElement.innerHTML = `
                 <div class="product-image-container">
-                    <img src="${product.thumbnail_url}" alt="${product.description}" class="product-image" loading="lazy">
+                    <img src="${product.thumbnail_url}" alt="${product.description}" class="product-image" loading="lazy" onerror="this.onerror=null; this.src='erro.png';">
                 </div>
                 <div class="product-content">
                     <h3 class="product-name">${product.description}</h3>
