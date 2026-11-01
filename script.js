@@ -53,13 +53,37 @@ class AppState {
         if (quantity <= 0) {
             this.cart.delete(productId);
         } else {
+            const cartItem = this.cart.get(productId);
             this.cart.set(productId, {
                 ...product,
+                ...cartItem,
                 quantity: quantity
             });
         }
 
         product.quantity = quantity;
+        this.saveCartToStorage();
+        return true;
+    }
+
+    setConfiguredCartItem(productId, quantity, observation, adicionaisSelecionados) {
+        const product = this.getProduct(productId);
+        if (!product) return false;
+
+        const additionalPrice = adicionaisSelecionados.reduce(
+            (total, additional) => total + additional.preco,
+            0
+        );
+        this.cart.set(productId, {
+            ...product,
+            basePrice: product.price,
+            price: product.price + additionalPrice,
+            quantity,
+            observation,
+            adicionaisSelecionados
+        });
+        product.quantity = quantity;
+        product.observation = observation;
         this.saveCartToStorage();
         return true;
     }
@@ -192,6 +216,8 @@ const elements = {
     modalQuantity: document.getElementById('modal-quantity'),
     modalMinus: document.getElementById('modal-minus'),
     modalPlus: document.getElementById('modal-plus'),
+    modalAdditionGroups: document.getElementById('modal-addition-groups'),
+    modalAddToCart: document.getElementById('modal-add-to-cart'),
     
     // Checkout Modal
     checkoutModal: document.getElementById('checkout-modal'),
@@ -658,6 +684,11 @@ const api = {
 
 // ===== UI FUNCTIONS =====
 const ui = {
+    productModalState: {
+        groups: [],
+        quantity: 1
+    },
+
     storeDetailsOpen: false,
     storeDetailsPreviousOverflow: '',
     storeDetailsInertStates: [],
@@ -898,6 +929,14 @@ const ui = {
                 quantity.className = 'cart-item-quantity';
                 quantity.textContent = `Quantidade: ${item.quantity}`;
                 info.append(name, price, quantity);
+                if (item.adicionaisSelecionados?.length) {
+                    const additions = document.createElement('div');
+                    additions.className = 'cart-item-addons';
+                    additions.textContent = item.adicionaisSelecionados
+                        .map(additional => `${additional.nome} (${additional.preco === 0 ? 'Grátis' : utils.formatCurrency(additional.preco)})`)
+                        .join(', ');
+                    info.appendChild(additions);
+                }
 
                 const removeButton = document.createElement('button');
                 removeButton.type = 'button';
@@ -1261,12 +1300,159 @@ const ui = {
         elements.modalPrice.textContent = utils.formatCurrency(product.price);
         elements.modalDescription.textContent = product.description2 || "Sem descrição detalhada disponível.";
         elements.modalObservation.value = product.observation || '';
-        elements.modalQuantity.textContent = product.quantity;
-
-        // Store current product ID for modal controls
+        const cartItem = appState.cart.get(productId);
+        const groups = this.getProductAdditionalGroups(product);
+        this.productModalState = {
+            groups,
+            quantity: cartItem?.quantity || 1
+        };
+        elements.modalQuantity.textContent = this.productModalState.quantity;
         elements.productModal.dataset.productId = productId;
+        this.renderProductAdditionalGroups(groups, cartItem?.adicionaisSelecionados || []);
+        this.updateProductModalTotal();
 
         utils.showModal(elements.productModal);
+    },
+
+    getProductAdditionalGroups(product) {
+        if (!Array.isArray(product.gruposAdicionaisIds)) return [];
+
+        return product.gruposAdicionaisIds.flatMap((group, groupIndex) => {
+            if (!group || typeof group !== 'object') return [];
+            const rawItems = group.itens ?? group.items ?? group.adicionais ??
+                group.opcoes ?? group.options;
+            if (!Array.isArray(rawItems)) return [];
+
+            const items = rawItems.flatMap((item, itemIndex) => {
+                if (!item || typeof item !== 'object') return [];
+                const name = String(item.nome ?? item.name ?? item.description ?? item.descricao ?? '').trim();
+                const price = Number(item.preco ?? item.price ?? item.valor ?? 0);
+                if (!name || !Number.isFinite(price)) return [];
+                return [{
+                    id: String(item._id ?? item.id ?? itemIndex),
+                    name,
+                    price
+                }];
+            });
+            if (!items.length) return [];
+
+            const maxValue = Number(group.max ?? group.maximo ?? group.quantidadeMaxima ?? items.length);
+            const minValue = Number(group.min ?? group.minimo ?? group.quantidadeMinima ?? 0);
+            const max = Number.isFinite(maxValue) ? Math.max(0, Math.floor(maxValue)) : items.length;
+            const required = group.obrigatorio === true || group.obrigatorio === 1 ||
+                ['true', '1'].includes(String(group.obrigatorio).toLowerCase());
+            const min = Number.isFinite(minValue)
+                ? Math.max(0, Math.ceil(minValue))
+                : (required ? 1 : 0);
+
+            return [{
+                id: String(group._id ?? group.id ?? groupIndex),
+                name: String(group.nome ?? group.name ?? group.titulo ?? group.title ?? '').trim() ||
+                    `Adicionais ${groupIndex + 1}`,
+                required,
+                min: required && min === 0 ? 1 : min,
+                max,
+                items
+            }];
+        });
+    },
+
+    renderProductAdditionalGroups(groups, selectedAdditions) {
+        elements.modalAdditionGroups.replaceChildren();
+        elements.modalAdditionGroups.classList.toggle('hidden', groups.length === 0);
+
+        groups.forEach((group, groupIndex) => {
+            const fieldset = document.createElement('fieldset');
+            fieldset.className = 'additional-group';
+            fieldset.dataset.groupIndex = groupIndex;
+
+            const title = document.createElement('legend');
+            title.className = 'additional-group-title';
+            title.textContent = group.name;
+
+            const rule = document.createElement('p');
+            rule.className = 'additional-group-rule';
+            const choiceRule = `Escolha de ${group.min} a ${group.max}`;
+            rule.textContent = `${group.required ? 'Obrigatório' : 'Opcional'} • ${choiceRule}`;
+            fieldset.append(title, rule);
+
+            group.items.forEach((item, itemIndex) => {
+                const label = document.createElement('label');
+                label.className = 'additional-option';
+
+                const input = document.createElement('input');
+                input.type = group.max === 1 ? 'radio' : 'checkbox';
+                input.name = `modal-additional-${groupIndex}`;
+                input.dataset.groupIndex = groupIndex;
+                input.dataset.itemIndex = itemIndex;
+                input.checked = selectedAdditions.some(additional => (
+                    (additional.itemId && additional.itemId === item.id &&
+                        (!additional.grupoId || additional.grupoId === group.id)) ||
+                    (!additional.itemId && additional.nome === item.name && Number(additional.preco) === item.price)
+                ));
+
+                const itemName = document.createElement('span');
+                itemName.className = 'additional-option-name';
+                itemName.textContent = item.name;
+
+                const itemPrice = document.createElement('span');
+                itemPrice.className = 'additional-option-price';
+                itemPrice.textContent = item.price === 0
+                    ? 'Grátis'
+                    : `+ ${utils.formatCurrency(item.price)}`;
+
+                label.append(input, itemName, itemPrice);
+                fieldset.appendChild(label);
+            });
+
+            elements.modalAdditionGroups.appendChild(fieldset);
+        });
+
+        this.updateAdditionalCheckboxLimits();
+    },
+
+    getSelectedProductAdditions() {
+        return [...elements.modalAdditionGroups.querySelectorAll('input:checked')].map(input => {
+            const group = this.productModalState.groups[Number(input.dataset.groupIndex)];
+            const item = group.items[Number(input.dataset.itemIndex)];
+            return {
+                nome: item.name,
+                preco: item.price,
+                grupoNome: group.name,
+                grupoId: group.id,
+                itemId: item.id
+            };
+        });
+    },
+
+    updateAdditionalCheckboxLimits() {
+        this.productModalState.groups.forEach((group, groupIndex) => {
+            const inputs = [
+                ...elements.modalAdditionGroups.querySelectorAll(
+                    `input[type="checkbox"][data-group-index="${groupIndex}"]`
+                )
+            ];
+            const selectedInputs = inputs.filter(input => input.checked);
+            selectedInputs.slice(group.max).forEach(input => {
+                input.checked = false;
+            });
+            const selectedCount = inputs.filter(input => input.checked).length;
+            inputs.forEach(input => {
+                input.disabled = !input.checked && selectedCount >= group.max;
+            });
+        });
+    },
+
+    updateProductModalTotal() {
+        const product = appState.getProduct(elements.productModal.dataset.productId);
+        if (!product) return;
+
+        const additionsTotal = this.getSelectedProductAdditions().reduce(
+            (total, additional) => total + additional.preco,
+            0
+        );
+        const total = (product.price + additionsTotal) * this.productModalState.quantity;
+        elements.modalAddToCart.textContent = `Adicionar • ${utils.formatCurrency(total)}`;
     },
 
     openCart() {
@@ -1383,30 +1569,56 @@ const eventHandlers = {
 
         // Product modal quantity controls
         elements.modalMinus.addEventListener('click', () => {
-            const productId = elements.productModal.dataset.productId;
-            const product = appState.getProduct(productId);
-            if (product) {
-                const newQuantity = Math.max(0, product.quantity - 1);
-                appState.updateCartItem(productId, newQuantity);
-                elements.modalQuantity.textContent = newQuantity;
-                ui.updateProductQuantityDisplay(productId, newQuantity);
-                ui.updateCartBadge();
-                ui.updateCartSidebar();
-            }
+            ui.productModalState.quantity = Math.max(1, ui.productModalState.quantity - 1);
+            elements.modalQuantity.textContent = ui.productModalState.quantity;
+            ui.updateProductModalTotal();
         });
 
         elements.modalPlus.addEventListener('click', () => {
+            ui.productModalState.quantity++;
+            elements.modalQuantity.textContent = ui.productModalState.quantity;
+            ui.updateProductModalTotal();
+        });
+
+        elements.modalAdditionGroups.addEventListener('change', event => {
+            if (!event.target.matches('input[type="radio"], input[type="checkbox"]')) return;
+            ui.updateAdditionalCheckboxLimits();
+            ui.updateProductModalTotal();
+        });
+
+        elements.modalAddToCart.addEventListener('click', () => {
             const productId = elements.productModal.dataset.productId;
-            const product = appState.getProduct(productId);
-            if (product) {
-                const newQuantity = product.quantity + 1;
-                appState.updateCartItem(productId, newQuantity);
-                elements.modalQuantity.textContent = newQuantity;
-                ui.updateProductQuantityDisplay(productId, newQuantity);
-                ui.updateCartBadge();
-                ui.updateCartSidebar();
-                utils.animateElement(elements.cartButton, 'bounce');
+            const missingGroup = ui.productModalState.groups.find((group, groupIndex) => {
+                if (!group.required) return false;
+                const selectedCount = elements.modalAdditionGroups.querySelectorAll(
+                    `input:checked[data-group-index="${groupIndex}"]`
+                ).length;
+                return selectedCount < group.min;
+            });
+            if (missingGroup) {
+                alert(`Selecione os adicionais obrigatórios do grupo "${missingGroup.name}".`);
+                elements.modalAdditionGroups
+                    .querySelector(`[data-group-index="${ui.productModalState.groups.indexOf(missingGroup)}"]`)
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
             }
+
+            const product = appState.getProduct(productId);
+            if (!product) {
+                console.error(`Não foi possível adicionar o produto ${productId}: produto não encontrado.`);
+                return;
+            }
+
+            const quantity = ui.productModalState.quantity;
+            const additions = ui.getSelectedProductAdditions();
+            const observation = elements.modalObservation.value.trim();
+            if (!appState.setConfiguredCartItem(productId, quantity, observation, additions)) return;
+
+            ui.updateProductQuantityDisplay(productId, quantity);
+            ui.updateCartBadge();
+            ui.updateCartSidebar();
+            utils.animateElement(elements.cartButton, 'bounce');
+            utils.hideModal(elements.productModal);
         });
 
         elements.modalObservation.addEventListener('input', () => {
@@ -1543,6 +1755,12 @@ const eventHandlers = {
 
             cartItems.forEach(item => {
                 message += `- (${item.quantity}x) ${item.description} - ${utils.formatCurrency(item.price * item.quantity)}\n`;
+                if (item.adicionaisSelecionados?.length) {
+                    const additions = item.adicionaisSelecionados
+                        .map(additional => `${additional.nome} (${additional.preco === 0 ? 'Grátis' : `+ ${utils.formatCurrency(additional.preco)}`})`)
+                        .join(', ');
+                    message += `  Adicionais: ${additions}\n`;
+                }
                 const observation = (appState.getProduct(item._id)?.observation || item.observation || '').trim();
                 if (observation) {
                     message += ` _Obs: ${observation.replace(/\r?\n/g, '\n  ')}_\n`;
