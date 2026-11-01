@@ -147,6 +147,7 @@
                 <i class="fas fa-credit-card"></i>
                 Finalizar Pedido
             </button>
+            <p class="store-order-notice hidden" id="cart-order-notice" role="status" aria-live="polite"></p>
         </div>
     </aside>
 
@@ -255,6 +256,7 @@
                         <i class="fab fa-whatsapp"></i>
                         Enviar Pedido via WhatsApp
                     </button>
+                    <p class="store-order-notice hidden" id="checkout-order-notice" role="status" aria-live="polite"></p>
                 </form>
             </div>
         </div>
@@ -301,11 +303,10 @@
 
     <section class="store-details-screen hidden" id="store-details-screen" role="dialog" aria-modal="true" aria-labelledby="store-details-name" aria-hidden="true">
         <div class="store-details-page">
-            <button class="store-details-close" id="store-details-close" type="button" aria-label="Fechar detalhes da loja">
-                <i class="fas fa-arrow-left" aria-hidden="true"></i>
-                <span>Voltar</span>
-            </button>
             <div class="store-details-content">
+                <button class="store-details-close" id="store-details-close" type="button" aria-label="Fechar detalhes da loja">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
                 <div class="store-details-logo-wrap">
                     <img class="store-details-logo hidden" id="store-details-logo" alt="">
                     <i class="fas fa-store store-details-logo-placeholder" id="store-details-logo-placeholder" aria-hidden="true"></i>

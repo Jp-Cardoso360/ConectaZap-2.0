@@ -179,6 +179,7 @@ const elements = {
     totalItems: document.getElementById('total-items'),
     totalPrice: document.getElementById('total-price'),
     checkoutBtn: document.getElementById('checkout-btn'),
+    cartOrderNotice: document.getElementById('cart-order-notice'),
     
     // Product Modal
     productModal: document.getElementById('product-modal'),
@@ -196,6 +197,8 @@ const elements = {
     checkoutModal: document.getElementById('checkout-modal'),
     checkoutClose: document.getElementById('checkout-close'),
     checkoutForm: document.getElementById('checkout-form'),
+    checkoutSubmit: document.querySelector('#checkout-form button[type="submit"]'),
+    checkoutOrderNotice: document.getElementById('checkout-order-notice'),
     customerName: document.getElementById('customer-name'),
     customerAddressGroup: document.getElementById('customer-address-group'),
     customerAddress: document.getElementById('customer-address'),
@@ -707,6 +710,25 @@ const ui = {
         elements.storeOpeningStatus.classList.add(statusClass);
         elements.storeOpeningStatus.classList.remove('hidden');
         this.updateStoreDetailsStatus(status);
+        this.updateOrderAvailability(status);
+        return status;
+    },
+
+    updateOrderAvailability(status = appState.storeHoursStatus) {
+        const unavailableMessage = !status?.available
+            ? 'Horário de funcionamento indisponível. Não é possível enviar pedidos agora.'
+            : !status.isOpen
+                ? 'A loja está fechada no momento. Pedidos poderão ser enviados durante o horário de funcionamento.'
+                : '';
+        const hasUnavailableMessage = Boolean(unavailableMessage);
+
+        elements.checkoutBtn.disabled = appState.getCartItemCount() === 0 || hasUnavailableMessage;
+        elements.checkoutBtn.title = unavailableMessage;
+        elements.checkoutSubmit.disabled = hasUnavailableMessage;
+        [elements.cartOrderNotice, elements.checkoutOrderNotice].forEach(notice => {
+            notice.textContent = unavailableMessage;
+            notice.classList.toggle('hidden', !hasUnavailableMessage);
+        });
     },
 
     updateStoreDetailsStatus(status) {
@@ -843,7 +865,7 @@ const ui = {
         elements.totalPrice.textContent = utils.formatCurrency(total);
 
         // Update checkout button
-        elements.checkoutBtn.disabled = itemCount === 0;
+        this.updateOrderAvailability();
 
         // Show/hide empty state
         if (cartItems.length === 0) {
@@ -1260,6 +1282,14 @@ const ui = {
     },
 
     showCheckoutModal() {
+        const status = this.updateStoreOpeningStatus();
+        if (!status?.available || !status.isOpen) {
+            alert(status?.available
+                ? 'A loja está fechada no momento e não pode receber pedidos.'
+                : 'O horário de funcionamento não está disponível. Não é possível enviar pedidos agora.');
+            return;
+        }
+
         const cartItems = appState.getCartItems();
         const itemCount = appState.getCartItemCount();
 
@@ -1464,6 +1494,14 @@ const eventHandlers = {
 
     async handleCheckoutSubmit(e) {
         e.preventDefault();
+
+        const status = ui.updateStoreOpeningStatus();
+        if (!status?.available || !status.isOpen) {
+            alert(status?.available
+                ? 'A loja está fechada no momento e não pode receber pedidos.'
+                : 'O horário de funcionamento não está disponível. Não é possível enviar pedidos agora.');
+            return;
+        }
         
         const formData = new FormData(e.target);
         const customerName = formData.get('name');
