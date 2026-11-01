@@ -72,6 +72,11 @@
         <section class="store-hero" aria-label="Banner da loja">
             <img class="store-hero-image hidden" alt="Banner da loja" fetchpriority="high">
         </section>
+        <button class="store-opening-status hidden" id="store-opening-status" type="button" aria-label="Consultar funcionamento da loja" aria-haspopup="dialog" aria-controls="store-details-screen">
+            <i class="fas fa-store" aria-hidden="true"></i>
+            <span id="store-opening-status-text">Horário não informado</span>
+            <i class="fas fa-chevron-right store-opening-status-chevron" aria-hidden="true"></i>
+        </button>
 
         <nav class="category-tabs hidden" id="category-tabs" aria-label="Filtrar produtos por categoria"></nav>
 
@@ -293,6 +298,33 @@
 
     <!-- Cart Overlay -->
     <div class="cart-overlay" id="cart-overlay"></div>
+
+    <section class="store-details-screen hidden" id="store-details-screen" role="dialog" aria-modal="true" aria-labelledby="store-details-name" aria-hidden="true">
+        <div class="store-details-page">
+            <button class="store-details-close" id="store-details-close" type="button" aria-label="Fechar detalhes da loja">
+                <i class="fas fa-arrow-left" aria-hidden="true"></i>
+                <span>Voltar</span>
+            </button>
+            <div class="store-details-content">
+                <div class="store-details-logo-wrap">
+                    <img class="store-details-logo hidden" id="store-details-logo" alt="">
+                    <i class="fas fa-store store-details-logo-placeholder" id="store-details-logo-placeholder" aria-hidden="true"></i>
+                </div>
+                <h1 class="store-details-name" id="store-details-name">Nome da loja não informado</h1>
+                <div class="store-details-status" id="store-details-status" role="status" aria-live="polite">
+                    <i class="fas fa-store" aria-hidden="true"></i>
+                    <span id="store-details-status-text">Horário não informado</span>
+                </div>
+                <section class="store-details-section" aria-labelledby="store-details-hours-title">
+                    <h2 id="store-details-hours-title">Horários de funcionamento</h2>
+                    <ul class="store-details-hours" id="store-details-hours"></ul>
+                </section>
+                <section class="store-details-section store-details-about" aria-labelledby="store-details-about-title">
+                    <h2 id="store-details-about-title">Sobre a empresa</h2>
+                    <p id="store-details-description">Descrição não informada.</p>
+                </section>
+            </div>
+        </div>
+    </section>
 </body>
 </html>
-

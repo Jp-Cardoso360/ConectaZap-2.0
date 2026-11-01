@@ -17,6 +17,7 @@ class AppState {
         this.products = new Map();
         this.cart = new Map();
         this.currentUser = null;
+        this.storeHoursStatus = null;
         this.storeSlug = null;
         this.userGoal = null;
         this.deliveryPlaces = [];
@@ -151,6 +152,17 @@ const elements = {
     storeSuspendedScreen: document.getElementById('store-suspended-screen'),
     brandName: document.querySelector('.brand-name'),
     storeHeroImage: document.querySelector('.store-hero-image'),
+    storeOpeningStatus: document.getElementById('store-opening-status'),
+    storeOpeningStatusText: document.getElementById('store-opening-status-text'),
+    storeDetailsScreen: document.getElementById('store-details-screen'),
+    storeDetailsClose: document.getElementById('store-details-close'),
+    storeDetailsLogo: document.getElementById('store-details-logo'),
+    storeDetailsLogoPlaceholder: document.getElementById('store-details-logo-placeholder'),
+    storeDetailsName: document.getElementById('store-details-name'),
+    storeDetailsStatus: document.getElementById('store-details-status'),
+    storeDetailsStatusText: document.getElementById('store-details-status-text'),
+    storeDetailsHours: document.getElementById('store-details-hours'),
+    storeDetailsDescription: document.getElementById('store-details-description'),
     
     // Categories
     categoriesContainer: document.getElementById('categories'),
@@ -256,6 +268,195 @@ const utils = {
             console.warn('Invalid store slug encoding in URL:', error);
             return lastSegment.trim();
         }
+    },
+
+    getStoreImageUrl(value) {
+        if (typeof value === 'string') {
+            const url = value.trim();
+            return ['null', 'undefined'].includes(url.toLocaleLowerCase('pt-BR')) ? '' : url;
+        }
+        if (!value || typeof value !== 'object') return '';
+
+        const url = value.url || value.src || value.href || value.imageUrl || value.image_url;
+        return typeof url === 'string' ? this.getStoreImageUrl(url) : '';
+    },
+
+    getStoreText(value) {
+        if (typeof value !== 'string' && typeof value !== 'number') return '';
+        const text = String(value).trim();
+        return ['null', 'undefined'].includes(text.toLocaleLowerCase('pt-BR')) ? '' : text;
+    },
+
+    normalizeDayName(value) {
+        return String(value ?? '')
+            .trim()
+            .toLocaleLowerCase('pt-BR')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]/g, '');
+    },
+
+    parseStoreTime(value) {
+        if (typeof value !== 'string') return null;
+        const match = value.trim().match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+        if (!match) return null;
+        return Number(match[1]) * 60 + Number(match[2]);
+    },
+
+    getStoreDayIndex(value) {
+        if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 6) {
+            return value;
+        }
+
+        const normalized = this.normalizeDayName(value);
+        const aliases = [
+            ['domingo', 'dom', 'sunday', 'sun', '0'],
+            ['segunda', 'segundafeira', 'seg', 'monday', 'mon', '1'],
+            ['terca', 'tercafeira', 'ter', 'tuesday', 'tue', '2'],
+            ['quarta', 'quartafeira', 'qua', 'wednesday', 'wed', '3'],
+            ['quinta', 'quintafeira', 'qui', 'thursday', 'thu', '4'],
+            ['sexta', 'sextafeira', 'sex', 'friday', 'fri', '5'],
+            ['sabado', 'sab', 'saturday', 'sat', '6']
+        ];
+        return aliases.findIndex(day => day.includes(normalized));
+    },
+
+    parseStoreIntervals(value) {
+        if (typeof value === 'string') {
+            const intervals = [];
+            const pattern = /(\d{1,2}:\d{2})\s*(?:-|–|—|às|as|a|até|ate)\s*(\d{1,2}:\d{2})/gi;
+            let match;
+            while ((match = pattern.exec(value)) !== null) {
+                const start = this.parseStoreTime(match[1]);
+                const end = this.parseStoreTime(match[2]);
+                if (start !== null && end !== null && start !== end) {
+                    intervals.push({ start, end });
+                }
+            }
+            return intervals;
+        }
+
+        if (Array.isArray(value)) {
+            if (value.length === 2) {
+                const start = this.parseStoreTime(value[0]);
+                const end = this.parseStoreTime(value[1]);
+                if (start !== null && end !== null && start !== end) {
+                    return [{ start, end }];
+                }
+            }
+            return value.flatMap(item => this.parseStoreIntervals(item));
+        }
+
+        if (!value || typeof value !== 'object') return [];
+
+        const startFields = ['inicio', 'horaInicio', 'hora_inicio', 'abertura', 'horaAbertura', 'hora_abertura', 'abre', 'start', 'from', 'open'];
+        const endFields = ['fim', 'horaFim', 'hora_fim', 'fechamento', 'horaFechamento', 'hora_fechamento', 'fecha', 'end', 'to', 'close'];
+        const startValue = startFields.map(field => value[field]).find(field => field != null);
+        const endValue = endFields.map(field => value[field]).find(field => field != null);
+        const start = this.parseStoreTime(startValue);
+        const end = this.parseStoreTime(endValue);
+        const intervals = start !== null && end !== null && start !== end ? [{ start, end }] : [];
+
+        for (const field of ['intervalos', 'intervals', 'turnos', 'horarios', 'horario']) {
+            if (value[field] != null) intervals.push(...this.parseStoreIntervals(value[field]));
+        }
+        return intervals;
+    },
+
+    isStoreDayDisabled(value) {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+            return value === false || value === 0 ||
+                (typeof value === 'string' && ['fechado', 'closed', 'false', '0'].includes(this.normalizeDayName(value)));
+        }
+
+        const toBoolean = candidate => {
+            if (typeof candidate === 'boolean') return candidate;
+            if (candidate === 0 || candidate === 1) return Boolean(candidate);
+            if (typeof candidate !== 'string') return null;
+            const normalized = this.normalizeDayName(candidate);
+            if (['true', 'sim', '1', 'ativo', 'aberto', 'open'].includes(normalized)) return true;
+            if (['false', 'nao', '0', 'inativo', 'fechado', 'closed'].includes(normalized)) return false;
+            return null;
+        };
+        const disabledFields = ['fechado', 'closed'];
+        const enabledFields = ['ativo', 'active', 'enabled', 'isActive', 'aberto', 'funciona', 'funcionando'];
+        if (disabledFields.some(field => toBoolean(value[field]) === true)) return true;
+        if (['status', 'situacao', 'situação'].some(field => {
+            const state = this.normalizeDayName(value[field]);
+            return ['fechado', 'closed', 'desativado', 'inativo'].includes(state);
+        })) return true;
+        return enabledFields.some(field => toBoolean(value[field]) === false);
+    },
+
+    parseStoreSchedule(schedule) {
+        let source = schedule;
+        if (typeof source === 'string') {
+            try {
+                source = JSON.parse(source);
+            } catch {
+                return null;
+            }
+        }
+        if (!source || typeof source !== 'object') return null;
+        source = source.diasSemana ?? source.dias ?? source.semana ??
+            source.horariosFuncionamento ?? source;
+        const values = Array(7).fill(null);
+
+        if (Array.isArray(source)) {
+            source.forEach((value, index) => {
+                const dayValue = value && typeof value === 'object'
+                    ? value.dia ?? value.day ?? value.diaSemana ?? value.weekday
+                    : null;
+                const dayIndex = dayValue == null ? index : this.getStoreDayIndex(dayValue);
+                if (dayIndex >= 0 && dayIndex <= 6) values[dayIndex] = value;
+            });
+        } else {
+            Object.entries(source).forEach(([key, value]) => {
+                const dayIndex = this.getStoreDayIndex(key);
+                if (dayIndex >= 0) values[dayIndex] = value;
+            });
+        }
+
+        const days = values.map(value => ({
+            configured: value != null,
+            disabled: this.isStoreDayDisabled(value),
+            intervals: this.parseStoreIntervals(value)
+        }));
+        const available = days.some(day => day.disabled || day.intervals.length > 0);
+        return available ? days : null;
+    },
+
+    getStoreHoursStatus(schedule, now = new Date()) {
+        const days = this.parseStoreSchedule(schedule);
+        if (!days) return { available: false, isOpen: false, days: null };
+
+        const dayIndex = now.getDay();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const today = days[dayIndex];
+        if (today.disabled) return { available: true, isOpen: false, days };
+
+        const previousDay = days[(dayIndex + 6) % 7];
+        const isOpenOvernight = !previousDay.disabled && previousDay.intervals.some(({ start, end }) => (
+            end < start && currentMinutes < end
+        ));
+        if (isOpenOvernight) return { available: true, isOpen: true, days };
+        if (!today.configured || !today.intervals.length) {
+            return { available: false, isOpen: false, days };
+        }
+
+        const isOpenToday = today.intervals.some(({ start, end }) => (
+            end > start
+                ? currentMinutes >= start && currentMinutes < end
+                : currentMinutes >= start
+        ));
+        return { available: true, isOpen: isOpenToday, days };
+    },
+
+    formatStoreIntervals(intervals) {
+        const formatTime = minutes => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+        return intervals
+            .map(({ start, end }) => `${formatTime(start)} às ${formatTime(end)}`)
+            .join(' · ');
     },
 
     debounce(func, wait) {
@@ -454,6 +655,12 @@ const api = {
 
 // ===== UI FUNCTIONS =====
 const ui = {
+    storeDetailsOpen: false,
+    storeDetailsPreviousOverflow: '',
+    storeDetailsInertStates: [],
+    storeDetailsUrl: '',
+    storeDetailsPreviousHistoryState: null,
+
     showLoading() {
         appState.isLoading = true;
         utils.showElement(elements.loadingScreen);
@@ -476,6 +683,134 @@ const ui = {
     hideStoreStatus() {
         elements.storeStatus.classList.add('hidden');
         elements.productsGrid.classList.remove('hidden');
+    },
+
+    updateStoreOpeningStatus() {
+        const store = appState.currentUser;
+        if (!store) return;
+
+        const status = utils.getStoreHoursStatus(store.hours);
+        appState.storeHoursStatus = status;
+        const label = status.available
+            ? status.isOpen ? 'Loja aberta' : 'Loja fechada'
+            : 'Horário não informado';
+        const statusClass = status.available
+            ? status.isOpen ? 'is-open' : 'is-closed'
+            : 'is-unavailable';
+
+        elements.storeOpeningStatusText.textContent = label;
+        elements.storeOpeningStatus.setAttribute(
+            'aria-label',
+            `${label}. Abrir detalhes e horários de funcionamento da loja.`
+        );
+        elements.storeOpeningStatus.classList.remove('is-open', 'is-closed', 'is-unavailable');
+        elements.storeOpeningStatus.classList.add(statusClass);
+        elements.storeOpeningStatus.classList.remove('hidden');
+        this.updateStoreDetailsStatus(status);
+    },
+
+    updateStoreDetailsStatus(status) {
+        const label = status.available
+            ? status.isOpen ? 'Loja aberta' : 'Loja fechada'
+            : 'Horário não informado';
+        const statusClass = status.available
+            ? status.isOpen ? 'is-open' : 'is-closed'
+            : 'is-unavailable';
+        elements.storeDetailsStatusText.textContent = label;
+        elements.storeDetailsStatus.classList.remove('is-open', 'is-closed', 'is-unavailable');
+        elements.storeDetailsStatus.classList.add(statusClass);
+    },
+
+    renderStoreDetails() {
+        const store = appState.currentUser;
+        if (!store) return;
+
+        elements.storeDetailsName.textContent = store.displayName || 'Nome da loja não informado';
+        elements.storeDetailsDescription.textContent = store.about || 'Descrição não informada.';
+        const logoUrl = utils.getStoreImageUrl(store.logo);
+        if (logoUrl) {
+            elements.storeDetailsLogo.src = logoUrl;
+            elements.storeDetailsLogo.alt = store.displayName
+                ? `Logo da ${store.displayName}`
+                : 'Logo da loja';
+            elements.storeDetailsLogo.classList.remove('hidden');
+            elements.storeDetailsLogoPlaceholder.classList.add('hidden');
+        } else {
+            elements.storeDetailsLogo.removeAttribute('src');
+            elements.storeDetailsLogo.alt = '';
+            elements.storeDetailsLogo.classList.add('hidden');
+            elements.storeDetailsLogoPlaceholder.classList.remove('hidden');
+        }
+
+        const days = appState.storeHoursStatus?.days;
+        const weekdayNames = [
+            'Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira',
+            'Quinta-feira', 'Sexta-feira', 'Sábado'
+        ];
+        elements.storeDetailsHours.replaceChildren();
+        weekdayNames.forEach((name, index) => {
+            const item = document.createElement('li');
+            const dayName = document.createElement('span');
+            const hours = document.createElement('span');
+            dayName.textContent = name;
+            hours.textContent = !days
+                ? 'Horário não informado'
+                : days[index].disabled
+                    ? 'Fechado'
+                    : days[index].intervals.length
+                        ? utils.formatStoreIntervals(days[index].intervals)
+                        : days[index].configured
+                            ? 'Horário não informado'
+                            : 'Horário não informado';
+            item.append(dayName, hours);
+            elements.storeDetailsHours.append(item);
+        });
+        this.updateStoreDetailsStatus(appState.storeHoursStatus || {
+            available: false,
+            isOpen: false
+        });
+    },
+
+    openStoreDetails() {
+        if (this.storeDetailsOpen || !appState.currentUser) return;
+        this.renderStoreDetails();
+        this.storeDetailsOpen = true;
+        this.storeDetailsPreviousOverflow = document.body.style.overflow;
+        this.storeDetailsInertStates = [...document.body.children]
+            .filter(child => child !== elements.storeDetailsScreen)
+            .map(child => ({ element: child, inert: child.inert }));
+        this.storeDetailsInertStates.forEach(({ element }) => { element.inert = true; });
+        document.body.style.overflow = 'hidden';
+
+        this.storeDetailsUrl = window.location.href;
+        this.storeDetailsPreviousHistoryState = window.history.state;
+        window.history.pushState(
+            { ...(window.history.state && typeof window.history.state === 'object' ? window.history.state : {}), storeDetailsOpen: true },
+            '',
+            this.storeDetailsUrl
+        );
+        elements.storeDetailsScreen.classList.remove('hidden');
+        elements.storeDetailsScreen.setAttribute('aria-hidden', 'false');
+        elements.storeDetailsClose.focus({ preventScroll: true });
+    },
+
+    closeStoreDetails({ restoreHistory = true, restoreFocus = true } = {}) {
+        if (!this.storeDetailsOpen) return;
+        this.storeDetailsOpen = false;
+        elements.storeDetailsScreen.classList.add('hidden');
+        elements.storeDetailsScreen.setAttribute('aria-hidden', 'true');
+        this.storeDetailsInertStates.forEach(({ element, inert }) => { element.inert = inert; });
+        this.storeDetailsInertStates = [];
+        document.body.style.overflow = this.storeDetailsPreviousOverflow;
+
+        if (restoreHistory && window.history.state?.storeDetailsOpen) {
+            window.history.replaceState(
+                this.storeDetailsPreviousHistoryState,
+                '',
+                this.storeDetailsUrl
+            );
+        }
+        if (restoreFocus) elements.storeOpeningStatus.focus({ preventScroll: true });
     },
 
     showSuspendedStore() {
@@ -1000,6 +1335,21 @@ const eventHandlers = {
         elements.modalClose.addEventListener('click', () => utils.hideModal(elements.productModal));
         elements.checkoutClose.addEventListener('click', () => utils.hideModal(elements.checkoutModal));
         elements.successClose.addEventListener('click', () => utils.hideModal(elements.successModal));
+        elements.storeOpeningStatus.addEventListener('click', () => ui.openStoreDetails());
+        elements.storeDetailsClose.addEventListener('click', () => ui.closeStoreDetails());
+        elements.storeDetailsLogo.addEventListener('error', () => {
+            elements.storeDetailsLogo.classList.add('hidden');
+            elements.storeDetailsLogoPlaceholder.classList.remove('hidden');
+        });
+        window.addEventListener('popstate', event => {
+            if (!ui.storeDetailsOpen) return;
+            window.history.pushState(event.state, '', ui.storeDetailsUrl);
+            ui.closeStoreDetails({ restoreHistory: false });
+        });
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) ui.updateStoreOpeningStatus();
+        });
+        window.setInterval(() => ui.updateStoreOpeningStatus(), 60_000);
 
         // Product modal quantity controls
         elements.modalMinus.addEventListener('click', () => {
@@ -1052,6 +1402,25 @@ const eventHandlers = {
 
         // Close modals on escape key
         document.addEventListener('keydown', (e) => {
+            if (ui.storeDetailsOpen) {
+                if (e.key === 'Escape') {
+                    ui.closeStoreDetails();
+                } else if (e.key === 'Tab') {
+                    const focusable = [...elements.storeDetailsScreen.querySelectorAll(
+                        'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                    )].filter(element => !element.classList.contains('hidden'));
+                    const first = focusable[0];
+                    const last = focusable[focusable.length - 1];
+                    if (e.shiftKey && document.activeElement === first) {
+                        e.preventDefault();
+                        last.focus();
+                    } else if (!e.shiftKey && document.activeElement === last) {
+                        e.preventDefault();
+                        first.focus();
+                    }
+                }
+                return;
+            }
             if (e.key === 'Escape') {
                 utils.hideModal(elements.productModal);
                 utils.hideModal(elements.checkoutModal);
@@ -1161,6 +1530,7 @@ const eventHandlers = {
     },
 
     handleKeydown(e) {
+        if (ui.storeDetailsOpen) return;
         // Add keyboard shortcuts
         if (e.ctrlKey || e.metaKey) {
             switch (e.key) {
@@ -1230,11 +1600,16 @@ const app = {
                 loja.corSistema ?? loja.systemColor ?? loja.color
             );
 
+            const displayName = utils.getStoreText(loja.nome ?? loja.name ?? loja.razaoSocial);
             appState.currentUser = {
                 id: String(storeId),
-                name: String(loja.nome ?? loja.name ?? loja.razaoSocial ?? 'Loja'),
+                name: displayName || 'Loja',
+                displayName,
                 phone: String(loja.tel ?? loja.telefone ?? loja.phone ?? ''),
                 banner: loja.banner ?? loja.bannerUrl ?? loja.banner_url ?? '',
+                logo: loja.logo ?? '',
+                hours: loja.horariosFuncionamento ?? null,
+                about: utils.getStoreText(loja.sobre),
                 color
             };
             appState.userGoal = storeAccount.goal ?? loja.meta ?? loja.goal ?? loja.objetivo ?? null;
@@ -1248,6 +1623,7 @@ const app = {
                 utils.getDarkerSystemColor(color)
             );
             elements.brandName.textContent = appState.currentUser.name;
+            ui.updateStoreOpeningStatus();
 
             const bannerUrl = typeof appState.currentUser.banner === 'string'
                 ? appState.currentUser.banner.trim()
