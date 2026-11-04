@@ -3161,15 +3161,15 @@ body.store-suspended {
 }
 
 .additional-option {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 82px 108px;
     align-items: center;
-    gap: 0.75rem;
-    min-height: 60px;
-    padding: 0.55rem 0.65rem;
+    gap: 0.65rem;
+    min-height: 58px;
+    padding: 0.5rem 0.55rem;
     border: 1px solid transparent;
     border-radius: 12px;
     transition: background-color var(--transition-fast), border-color var(--transition-fast);
-    cursor: pointer;
 }
 
 .additional-option + .additional-option {
@@ -3182,37 +3182,45 @@ body.store-suspended {
 }
 
 .additional-option-name {
-    flex: 1;
+    min-width: 0;
     color: var(--text-primary);
     font-weight: 500;
     text-align: left;
+    overflow-wrap: anywhere;
 }
 
 .additional-option-price {
-    padding: 0.3rem 0.55rem;
+    width: 82px;
+    padding: 0.3rem 0.35rem;
     border-radius: 999px;
     background: color-mix(in srgb, var(--primary-color) 10%, #fff);
     color: var(--primary-dark);
     font-size: var(--font-size-sm);
     font-weight: 600;
+    text-align: center;
     white-space: nowrap;
 }
 
 .additional-quantity-control {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    justify-content: space-between;
+    width: 108px;
+    min-width: 108px;
+    gap: 0;
     padding: 0.2rem;
     border: 1px solid var(--border-color);
     border-radius: 999px;
     background: #fff;
     box-shadow: 0 2px 6px rgba(30, 50, 40, 0.06);
+    justify-self: end;
 }
 
 .additional-quantity-button {
     display: grid;
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
     place-items: center;
     border: 0;
     border-radius: 50%;
@@ -3220,6 +3228,7 @@ body.store-suspended {
     color: var(--primary-dark);
     font: 600 1.2rem/1 var(--font-secondary);
     cursor: pointer;
+    touch-action: manipulation;
     transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
@@ -3236,7 +3245,8 @@ body.store-suspended {
 }
 
 .additional-option-quantity {
-    min-width: 1.5rem;
+    min-width: 2rem;
+    flex: 1;
     color: var(--text-primary);
     font-size: 0.95rem;
     font-weight: 700;
@@ -3273,4 +3283,35 @@ body.store-suspended {
     color: var(--text-secondary);
     font-size: var(--font-size-xs);
     line-height: 1.4;
+}
+
+@media (max-width: 380px) {
+    .additional-group {
+        padding: 0.85rem;
+    }
+
+    .additional-option {
+        grid-template-columns: minmax(0, 1fr) 68px 96px;
+        gap: 0.4rem;
+        padding-right: 0.35rem;
+        padding-left: 0.35rem;
+    }
+
+    .additional-option-price {
+        width: 68px;
+        padding-right: 0.2rem;
+        padding-left: 0.2rem;
+        font-size: var(--font-size-xs);
+    }
+
+    .additional-quantity-control {
+        width: 96px;
+        min-width: 96px;
+    }
+
+    .additional-quantity-button {
+        width: 26px;
+        height: 26px;
+        flex-basis: 26px;
+    }
 }

@@ -1920,14 +1920,14 @@ const eventHandlers = {
             // Build WhatsApp message
             const businessName = (appState.currentUser?.name || 'ConectaZap').toLocaleUpperCase('pt-BR');
             const deliveryLabel = needsAddress ? 'Bairro' : 'Retirada';
-            let message = `NOVO PEDIDO - ${businessName}\n\n`;
-            message += `Cliente: ${customerName}\n`;
-            message += `${deliveryLabel}: ${deliveryPlace.name}\n`;
+            let message = `*NOVO PEDIDO - ${businessName}*\n\n`;
+            message += `*Cliente:* ${customerName}\n`;
+            message += `*${deliveryLabel}:* ${deliveryPlace.name}\n`;
             if (needsAddress) {
-                message += `Endereço: ${customerAddress}\n`;
+                message += `*Endereço:* ${customerAddress}\n`;
             }
-            message += `Pagamento: ${paymentMethod}\n\n`;
-            message += `Itens do Pedido:\n`;
+            message += `*Pagamento:* ${paymentMethod}\n\n`;
+            message += `*Itens do Pedido:*\n`;
 
             const orderLines = appState.getGroupedCartItems(cartItems).map(item => {
                 const additions = item.adicionaisSelecionados || [];
@@ -1947,12 +1947,12 @@ const eventHandlers = {
                 }
                 return line;
             });
-            message += `${orderLines.join('\n')}\n\n`;
+            message += `${orderLines.join('\n\n')}\n\n`;
 
-            message += `Resumo:\n\n`;
+            message += `*Resumo:*\n\n`;
             message += `- Subtotal: ${utils.formatCurrency(subtotal)}\n`;
             message += `- Taxa de entrega: ${utils.formatCurrency(deliveryFee)}\n`;
-            message += `Valor Total: ${utils.formatCurrency(total)}`;
+            message += `*Valor Total: ${utils.formatCurrency(total)}*`;
 
             // Send to WhatsApp
             const whatsappUrl = `https://api.whatsapp.com/send?phone=${appState.currentUser?.phone}&text=${encodeURIComponent(message)}`;
