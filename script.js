@@ -53,37 +53,104 @@ class AppState {
         if (quantity <= 0) {
             this.cart.delete(productId);
         } else {
-            const cartItem = this.cart.get(productId);
             this.cart.set(productId, {
                 ...product,
-                ...cartItem,
+                basePrice: product.price,
+                observation: '',
+                adicionaisSelecionados: [],
                 quantity: quantity
             });
         }
 
-        product.quantity = quantity;
+        this.updateProductCartQuantity(productId);
         this.saveCartToStorage();
         return true;
+    }
+
+    adjustCartItem(productId, adjustment) {
+        const product = this.getProduct(productId);
+        if (!product || !adjustment) return false;
+
+        const defaultItem = this.cart.get(productId);
+        if (adjustment > 0) {
+            if (defaultItem) {
+                defaultItem.quantity += adjustment;
+            } else {
+                this.cart.set(productId, {
+                    ...product,
+                    basePrice: product.price,
+                    observation: '',
+                    adicionaisSelecionados: [],
+                    quantity: adjustment
+                });
+            }
+        } else {
+            const itemToReduce = defaultItem || [...this.cart.entries()]
+                .reverse()
+                .find(([, item]) => String(item._id) === String(productId))?.[1];
+            if (!itemToReduce) return false;
+            itemToReduce.quantity = Math.max(0, itemToReduce.quantity + adjustment);
+            if (itemToReduce.quantity === 0) {
+                const cartKey = [...this.cart.entries()]
+                    .find(([, item]) => item === itemToReduce)?.[0];
+                if (cartKey !== undefined) this.cart.delete(cartKey);
+            }
+        }
+
+        this.updateProductCartQuantity(productId);
+        this.saveCartToStorage();
+        return true;
+    }
+
+    removeCartItem(cartKey) {
+        const item = this.cart.get(cartKey);
+        if (!item) return false;
+
+        this.cart.delete(cartKey);
+        this.updateProductCartQuantity(item._id);
+        this.saveCartToStorage();
+        return true;
+    }
+
+    updateProductCartQuantity(productId) {
+        const product = this.getProduct(productId);
+        if (!product) return;
+
+        product.quantity = this.getCartItems()
+            .filter(item => String(item._id) === String(productId))
+            .reduce((total, item) => total + item.quantity, 0);
     }
 
     setConfiguredCartItem(productId, quantity, observation, adicionaisSelecionados) {
         const product = this.getProduct(productId);
         if (!product) return false;
 
+        const normalizedObservation = observation.trim();
+        const configuration = JSON.stringify([
+            String(productId),
+            product.price,
+            normalizedObservation,
+            adicionaisSelecionados.map(additional => [
+                additional.grupoId,
+                additional.itemId,
+                additional.quantidade
+            ]).sort((first, second) => JSON.stringify(first).localeCompare(JSON.stringify(second)))
+        ]);
+        const cartKey = `configured:${encodeURIComponent(configuration)}`;
         const additionalPrice = adicionaisSelecionados.reduce(
             (total, additional) => total + additional.preco * additional.quantidade,
             0
         );
-        this.cart.set(productId, {
+        const existingItem = this.cart.get(cartKey);
+        this.cart.set(cartKey, {
             ...product,
             basePrice: product.price,
             price: product.price + additionalPrice,
-            quantity,
-            observation,
+            quantity: (existingItem?.quantity || 0) + quantity,
+            observation: normalizedObservation,
             adicionaisSelecionados
         });
-        product.quantity = quantity;
-        product.observation = observation;
+        this.updateProductCartQuantity(productId);
         this.saveCartToStorage();
         return true;
     }
@@ -93,10 +160,6 @@ class AppState {
         if (!product) return false;
 
         product.observation = observation;
-        const cartItem = this.cart.get(productId);
-        if (cartItem) {
-            cartItem.observation = observation;
-        }
         this.saveCartToStorage();
         return true;
     }
@@ -105,8 +168,52 @@ class AppState {
         return Array.from(this.cart.values());
     }
 
+    getCartItemUnitPrice(item) {
+        const additionsPrice = (item.adicionaisSelecionados || []).reduce(
+            (total, additional) => total + Number(additional.preco) * Number(additional.quantidade || 1),
+            0
+        );
+        const basePrice = item.basePrice != null && Number.isFinite(Number(item.basePrice))
+            ? Number(item.basePrice)
+            : Number(item.price) - additionsPrice;
+        return basePrice + additionsPrice;
+    }
+
     getCartTotal() {
-        return this.getCartItems().reduce((total, item) => total + (item.price * item.quantity), 0);
+        return this.getCartItems().reduce(
+            (total, item) => total + this.getCartItemUnitPrice(item) * item.quantity,
+            0
+        );
+    }
+
+    getGroupedCartItems(cartItems = this.getCartItems()) {
+        const groupedItems = new Map();
+        cartItems.forEach(item => {
+            const additions = (item.adicionaisSelecionados || []).map(additional => [
+                String(additional.grupoId ?? ''),
+                String(additional.itemId ?? additional.nome),
+                Number(additional.quantidade || 1),
+                Number(additional.preco)
+            ]).sort((first, second) => JSON.stringify(first).localeCompare(JSON.stringify(second)));
+            const signature = JSON.stringify([
+                String(item._id),
+                this.getCartItemUnitPrice(item),
+                String(item.observation || '').trim(),
+                additions
+            ]);
+            const existing = groupedItems.get(signature);
+            if (existing) {
+                existing.quantity += item.quantity;
+            } else {
+                groupedItems.set(signature, {
+                    ...item,
+                    price: this.getCartItemUnitPrice(item),
+                    quantity: item.quantity,
+                    adicionaisSelecionados: item.adicionaisSelecionados || []
+                });
+            }
+        });
+        return [...groupedItems.values()];
     }
 
     getCartItemCount() {
@@ -947,10 +1054,11 @@ const ui = {
                 const removeButton = document.createElement('button');
                 removeButton.type = 'button';
                 removeButton.className = 'cart-item-remove';
-                removeButton.dataset.productId = item._id;
+                removeButton.dataset.cartKey = [...appState.cart.entries()]
+                    .find(([, cartItem]) => cartItem === item)?.[0] ?? item._id;
                 removeButton.setAttribute(
                     'aria-label',
-                    `Remover ${item.description} do carrinho`
+                    `Remover ${item.description} desta personalização do carrinho`
                 );
                 const icon = document.createElement('i');
                 icon.className = 'fas fa-times';
@@ -1262,20 +1370,16 @@ const ui = {
                 
                 if (!product) return;
 
-                let newQuantity = product.quantity;
-                if (action === 'increase') {
-                    newQuantity++;
-                } else if (action === 'decrease') {
-                    newQuantity = Math.max(0, newQuantity - 1);
-                }
-
-                appState.updateCartItem(productId, newQuantity);
+                const previousQuantity = product.quantity;
+                const adjustment = action === 'increase' ? 1 : -1;
+                if (!appState.adjustCartItem(productId, adjustment)) return;
+                const newQuantity = appState.getProduct(productId).quantity;
                 this.updateProductQuantityDisplay(productId, newQuantity);
                 this.updateCartBadge();
                 this.updateCartSidebar();
 
                 // Add bounce animation to cart button
-                if (newQuantity > product.quantity) {
+                if (newQuantity > previousQuantity) {
                     utils.animateElement(elements.cartButton, 'bounce');
                 }
             });
@@ -1306,15 +1410,15 @@ const ui = {
         elements.modalPrice.textContent = utils.formatCurrency(product.price);
         elements.modalDescription.textContent = product.description2 || "Sem descrição detalhada disponível.";
         elements.modalObservation.value = product.observation || '';
-        const cartItem = appState.cart.get(productId);
         const groups = this.getProductAdditionalGroups(product);
         this.productModalState = {
             groups,
-            quantity: cartItem?.quantity || 1
+            quantity: 1
         };
         elements.modalQuantity.textContent = this.productModalState.quantity;
         elements.productModal.dataset.productId = productId;
-        this.renderProductAdditionalGroups(groups, cartItem?.adicionaisSelecionados || []);
+        elements.modalObservation.value = '';
+        this.renderProductAdditionalGroups(groups, []);
         this.updateProductModalTotal();
 
         utils.showModal(elements.productModal);
@@ -1379,13 +1483,12 @@ const ui = {
 
             const rule = document.createElement('p');
             rule.className = 'additional-group-rule';
-            const choiceRule = group.min === group.max
-                ? `Escolha ${group.min} ${group.min === 1 ? 'unidade' : 'unidades'}`
-                : `Escolha de ${group.min} a ${group.max} unidades`;
+            const choiceRule = group.min > 0
+                ? `Mínimo de ${group.min} ${group.min === 1 ? 'unidade' : 'unidades'} • até ${group.max} de cada opção`
+                : `Até ${group.max} de cada opção`;
             rule.textContent = `${group.required ? 'Obrigatório' : 'Opcional'} • ${choiceRule}`;
             fieldset.append(title, rule);
 
-            let groupQuantity = 0;
             group.items.forEach((item, itemIndex) => {
                 const row = document.createElement('div');
                 row.className = 'additional-option';
@@ -1398,8 +1501,7 @@ const ui = {
                 const requestedQuantity = selectedAddition
                     ? Math.max(1, Number(selectedAddition.quantidade) || 1)
                     : 0;
-                const itemQuantity = Math.min(requestedQuantity, group.max - groupQuantity);
-                groupQuantity += itemQuantity;
+                const itemQuantity = Math.min(requestedQuantity, group.max);
                 const quantity = document.createElement('span');
                 quantity.className = 'additional-option-quantity';
                 quantity.textContent = String(itemQuantity);
@@ -1483,7 +1585,6 @@ const ui = {
                     `.additional-option-quantity[data-group-index="${groupIndex}"]`
                 )
             ];
-            const selectedCount = this.getGroupSelectedQuantity(groupIndex);
             rows.forEach(row => {
                 const quantity = Number(row.textContent);
                 const itemIndex = row.dataset.itemIndex;
@@ -1494,7 +1595,7 @@ const ui = {
                     `.additional-quantity-button[data-action="increase"][data-group-index="${groupIndex}"][data-item-index="${itemIndex}"]`
                 );
                 minusButton.disabled = quantity === 0;
-                plusButton.disabled = selectedCount >= group.max;
+                plusButton.disabled = quantity >= group.max;
             });
         });
     },
@@ -1576,10 +1677,12 @@ const eventHandlers = {
             const removeButton = event.target.closest('.cart-item-remove');
             if (!removeButton) return;
 
-            const productId = removeButton.dataset.productId;
-            if (!appState.updateCartItem(productId, 0)) return;
+            const cartKey = removeButton.dataset.cartKey;
+            const item = appState.cart.get(cartKey);
+            if (!item || !appState.removeCartItem(cartKey)) return;
 
-            ui.updateProductQuantityDisplay(productId, 0);
+            const productId = item._id;
+            ui.updateProductQuantityDisplay(productId, appState.getProduct(productId)?.quantity || 0);
             ui.updateCartBadge();
             ui.updateCartSidebar();
         });
@@ -1651,7 +1754,7 @@ const eventHandlers = {
 
             const currentQuantity = Number(quantity.textContent);
             if (button.dataset.action === 'increase') {
-                if (ui.getGroupSelectedQuantity(groupIndex) >= group.max) return;
+                if (currentQuantity >= group.max) return;
                 quantity.textContent = String(currentQuantity + 1);
             } else {
                 quantity.textContent = String(Math.max(0, currentQuantity - 1));
@@ -1826,22 +1929,26 @@ const eventHandlers = {
             message += `*Pagamento:* ${paymentMethod}\n\n`;
             message += `*Itens do Pedido:*\n`;
 
-            cartItems.forEach(item => {
-                message += `- (${item.quantity}x) ${item.description} - ${utils.formatCurrency(item.price * item.quantity)}\n`;
+            appState.getGroupedCartItems(cartItems).forEach(item => {
+                const lineTotal = item.price * item.quantity;
+                message += `- (${item.quantity}x) ${item.description} — ${utils.formatCurrency(item.price)} cada | Subtotal: ${utils.formatCurrency(lineTotal)}\n`;
                 if (item.adicionaisSelecionados?.length) {
                     const additions = item.adicionaisSelecionados
                         .map(additional => {
-                            const quantity = additional.quantidade || 1;
-                            const subtotal = additional.preco * quantity;
-                            const detail = additional.preco === 0
+                            const quantity = Number(additional.quantidade || 1);
+                            const subtotal = Number(additional.preco) * quantity;
+                            const detail = Number(additional.preco) === 0
                                 ? `${quantity}x Grátis`
                                 : `${quantity}x ${utils.formatCurrency(additional.preco)} = ${utils.formatCurrency(subtotal)}`;
                             return `${additional.nome} (${detail})`;
                         })
                         .join(', ');
-                    message += `  Adicionais: ${additions}\n`;
+                    const appliesTo = item.quantity > 1
+                        ? `vale para todas as ${item.quantity} unidades`
+                        : 'por unidade';
+                    message += `  Personalização (${appliesTo}): ${additions}\n`;
                 }
-                const observation = (appState.getProduct(item._id)?.observation || item.observation || '').trim();
+                const observation = (item.observation || '').trim();
                 if (observation) {
                     message += ` _Obs: ${observation.replace(/\r?\n/g, '\n  ')}_\n`;
                 }
@@ -1996,13 +2103,26 @@ const app = {
             });
 
             products.forEach(product => appState.addProduct(product));
-            appState.cart.forEach((item, productId) => {
+            appState.cart.forEach((item, cartKey) => {
+                const productId = String(item._id ?? cartKey);
                 const product = appState.getProduct(productId);
                 if (product) {
-                    product.quantity = item.quantity;
-                    product.observation = item.observation || '';
+                    item._id = productId;
+                    item.basePrice = item.basePrice != null && Number.isFinite(Number(item.basePrice))
+                        ? Number(item.basePrice)
+                        : Number(item.price) - (item.adicionaisSelecionados || []).reduce(
+                            (total, additional) => total +
+                                Number(additional.preco) * Number(additional.quantidade || 1),
+                            0
+                        );
+                    item.price = appState.getCartItemUnitPrice(item);
+                    item.adicionaisSelecionados = (item.adicionaisSelecionados || []).map(additional => ({
+                        ...additional,
+                        quantidade: Math.max(1, Number(additional.quantidade) || 1)
+                    }));
+                    product.quantity += item.quantity;
                 } else {
-                    appState.cart.delete(productId);
+                    appState.cart.delete(cartKey);
                 }
             });
             appState.saveCartToStorage();
