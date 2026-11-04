@@ -71,7 +71,7 @@ class AppState {
         if (!product) return false;
 
         const additionalPrice = adicionaisSelecionados.reduce(
-            (total, additional) => total + additional.preco,
+            (total, additional) => total + additional.preco * additional.quantidade,
             0
         );
         this.cart.set(productId, {
@@ -933,7 +933,13 @@ const ui = {
                     const additions = document.createElement('div');
                     additions.className = 'cart-item-addons';
                     additions.textContent = item.adicionaisSelecionados
-                        .map(additional => `${additional.nome} (${additional.preco === 0 ? 'Grátis' : utils.formatCurrency(additional.preco)})`)
+                        .map(additional => {
+                            const quantity = additional.quantidade || 1;
+                            const price = additional.preco === 0
+                                ? 'Grátis'
+                                : `${quantity}x ${utils.formatCurrency(additional.preco)}`;
+                            return `${additional.nome} (${price})`;
+                        })
                         .join(', ');
                     info.appendChild(additions);
                 }
@@ -1341,16 +1347,17 @@ const ui = {
             const max = Number.isFinite(maxValue) ? Math.max(0, Math.floor(maxValue)) : items.length;
             const required = group.obrigatorio === true || group.obrigatorio === 1 ||
                 ['true', '1'].includes(String(group.obrigatorio).toLowerCase());
-            const min = Number.isFinite(minValue)
+            const configuredMin = Number.isFinite(minValue)
                 ? Math.max(0, Math.ceil(minValue))
                 : (required ? 1 : 0);
+            const min = Math.min(max, required && configuredMin === 0 ? 1 : configuredMin);
 
             return [{
                 id: String(group._id ?? group.id ?? groupIndex),
                 name: String(group.nome ?? group.name ?? group.titulo ?? group.title ?? '').trim() ||
                     `Adicionais ${groupIndex + 1}`,
                 required,
-                min: required && min === 0 ? 1 : min,
+                min,
                 max,
                 items
             }];
@@ -1372,24 +1379,32 @@ const ui = {
 
             const rule = document.createElement('p');
             rule.className = 'additional-group-rule';
-            const choiceRule = `Escolha de ${group.min} a ${group.max}`;
+            const choiceRule = group.min === group.max
+                ? `Escolha ${group.min} ${group.min === 1 ? 'unidade' : 'unidades'}`
+                : `Escolha de ${group.min} a ${group.max} unidades`;
             rule.textContent = `${group.required ? 'Obrigatório' : 'Opcional'} • ${choiceRule}`;
             fieldset.append(title, rule);
 
+            let groupQuantity = 0;
             group.items.forEach((item, itemIndex) => {
-                const label = document.createElement('label');
-                label.className = 'additional-option';
+                const row = document.createElement('div');
+                row.className = 'additional-option';
 
-                const input = document.createElement('input');
-                input.type = group.max === 1 ? 'radio' : 'checkbox';
-                input.name = `modal-additional-${groupIndex}`;
-                input.dataset.groupIndex = groupIndex;
-                input.dataset.itemIndex = itemIndex;
-                input.checked = selectedAdditions.some(additional => (
+                const selectedAddition = selectedAdditions.find(additional => (
                     (additional.itemId && additional.itemId === item.id &&
                         (!additional.grupoId || additional.grupoId === group.id)) ||
                     (!additional.itemId && additional.nome === item.name && Number(additional.preco) === item.price)
                 ));
+                const requestedQuantity = selectedAddition
+                    ? Math.max(1, Number(selectedAddition.quantidade) || 1)
+                    : 0;
+                const itemQuantity = Math.min(requestedQuantity, group.max - groupQuantity);
+                groupQuantity += itemQuantity;
+                const quantity = document.createElement('span');
+                quantity.className = 'additional-option-quantity';
+                quantity.textContent = String(itemQuantity);
+                quantity.dataset.groupIndex = groupIndex;
+                quantity.dataset.itemIndex = itemIndex;
 
                 const itemName = document.createElement('span');
                 itemName.className = 'additional-option-name';
@@ -1399,46 +1414,87 @@ const ui = {
                 itemPrice.className = 'additional-option-price';
                 itemPrice.textContent = item.price === 0
                     ? 'Grátis'
-                    : `+ ${utils.formatCurrency(item.price)}`;
+                    : utils.formatCurrency(item.price);
 
-                label.append(input, itemName, itemPrice);
-                fieldset.appendChild(label);
+                const quantityControl = document.createElement('div');
+                quantityControl.className = 'additional-quantity-control';
+
+                const minusButton = document.createElement('button');
+                minusButton.type = 'button';
+                minusButton.className = 'additional-quantity-button';
+                minusButton.dataset.action = 'decrease';
+                minusButton.dataset.groupIndex = groupIndex;
+                minusButton.dataset.itemIndex = itemIndex;
+                minusButton.setAttribute('aria-label', `Remover uma unidade de ${item.name}`);
+                minusButton.textContent = '−';
+                minusButton.disabled = Number(quantity.textContent) === 0;
+
+                const plusButton = document.createElement('button');
+                plusButton.type = 'button';
+                plusButton.className = 'additional-quantity-button';
+                plusButton.dataset.action = 'increase';
+                plusButton.dataset.groupIndex = groupIndex;
+                plusButton.dataset.itemIndex = itemIndex;
+                plusButton.setAttribute('aria-label', `Adicionar uma unidade de ${item.name}`);
+                plusButton.textContent = '+';
+
+                quantityControl.append(minusButton, quantity, plusButton);
+                row.append(itemName, itemPrice, quantityControl);
+                fieldset.appendChild(row);
             });
 
             elements.modalAdditionGroups.appendChild(fieldset);
         });
 
-        this.updateAdditionalCheckboxLimits();
+        this.updateAdditionalQuantityControls();
     },
 
     getSelectedProductAdditions() {
-        return [...elements.modalAdditionGroups.querySelectorAll('input:checked')].map(input => {
-            const group = this.productModalState.groups[Number(input.dataset.groupIndex)];
-            const item = group.items[Number(input.dataset.itemIndex)];
-            return {
-                nome: item.name,
-                preco: item.price,
-                grupoNome: group.name,
-                grupoId: group.id,
-                itemId: item.id
-            };
-        });
+        return [...elements.modalAdditionGroups.querySelectorAll('.additional-option-quantity')]
+            .flatMap(quantityElement => {
+                const quantity = Number(quantityElement.textContent);
+                if (!quantity) return [];
+
+                const group = this.productModalState.groups[Number(quantityElement.dataset.groupIndex)];
+                const item = group.items[Number(quantityElement.dataset.itemIndex)];
+                return [{
+                    nome: item.name,
+                    preco: item.price,
+                    quantidade: quantity,
+                    grupoNome: group.name,
+                    grupoId: group.id,
+                    itemId: item.id
+                }];
+            });
     },
 
-    updateAdditionalCheckboxLimits() {
+    getGroupSelectedQuantity(groupIndex) {
+        return [
+            ...elements.modalAdditionGroups.querySelectorAll(
+                `.additional-option-quantity[data-group-index="${groupIndex}"]`
+            )
+        ].reduce((total, row) => total + Number(row.textContent), 0);
+    },
+
+    updateAdditionalQuantityControls() {
         this.productModalState.groups.forEach((group, groupIndex) => {
-            const inputs = [
+            const rows = [
                 ...elements.modalAdditionGroups.querySelectorAll(
-                    `input[type="checkbox"][data-group-index="${groupIndex}"]`
+                    `.additional-option-quantity[data-group-index="${groupIndex}"]`
                 )
             ];
-            const selectedInputs = inputs.filter(input => input.checked);
-            selectedInputs.slice(group.max).forEach(input => {
-                input.checked = false;
-            });
-            const selectedCount = inputs.filter(input => input.checked).length;
-            inputs.forEach(input => {
-                input.disabled = !input.checked && selectedCount >= group.max;
+            const selectedCount = this.getGroupSelectedQuantity(groupIndex);
+            rows.forEach(row => {
+                const quantity = Number(row.textContent);
+                const itemIndex = row.dataset.itemIndex;
+                const minusButton = elements.modalAdditionGroups.querySelector(
+                    `.additional-quantity-button[data-action="decrease"][data-group-index="${groupIndex}"][data-item-index="${itemIndex}"]`
+                );
+                const plusButton = elements.modalAdditionGroups.querySelector(
+                    `.additional-quantity-button[data-action="increase"][data-group-index="${groupIndex}"][data-item-index="${itemIndex}"]`
+                );
+                minusButton.disabled = quantity === 0;
+                plusButton.disabled = selectedCount >= group.max;
             });
         });
     },
@@ -1448,7 +1504,7 @@ const ui = {
         if (!product) return;
 
         const additionsTotal = this.getSelectedProductAdditions().reduce(
-            (total, additional) => total + additional.preco,
+            (total, additional) => total + additional.preco * additional.quantidade,
             0
         );
         const total = (product.price + additionsTotal) * this.productModalState.quantity;
@@ -1580,9 +1636,28 @@ const eventHandlers = {
             ui.updateProductModalTotal();
         });
 
-        elements.modalAdditionGroups.addEventListener('change', event => {
-            if (!event.target.matches('input[type="radio"], input[type="checkbox"]')) return;
-            ui.updateAdditionalCheckboxLimits();
+        elements.modalAdditionGroups.addEventListener('click', event => {
+            const button = event.target.closest('.additional-quantity-button');
+            if (!button || button.disabled) return;
+
+            const groupIndex = Number(button.dataset.groupIndex);
+            const itemIndex = Number(button.dataset.itemIndex);
+            const group = ui.productModalState.groups[groupIndex];
+            const item = group?.items[itemIndex];
+            const quantity = elements.modalAdditionGroups.querySelector(
+                `.additional-option-quantity[data-group-index="${groupIndex}"][data-item-index="${itemIndex}"]`
+            );
+            if (!group || !item || !quantity) return;
+
+            const currentQuantity = Number(quantity.textContent);
+            if (button.dataset.action === 'increase') {
+                if (ui.getGroupSelectedQuantity(groupIndex) >= group.max) return;
+                quantity.textContent = String(currentQuantity + 1);
+            } else {
+                quantity.textContent = String(Math.max(0, currentQuantity - 1));
+            }
+
+            ui.updateAdditionalQuantityControls();
             ui.updateProductModalTotal();
         });
 
@@ -1590,9 +1665,7 @@ const eventHandlers = {
             const productId = elements.productModal.dataset.productId;
             const missingGroup = ui.productModalState.groups.find((group, groupIndex) => {
                 if (!group.required) return false;
-                const selectedCount = elements.modalAdditionGroups.querySelectorAll(
-                    `input:checked[data-group-index="${groupIndex}"]`
-                ).length;
+                const selectedCount = ui.getGroupSelectedQuantity(groupIndex);
                 return selectedCount < group.min;
             });
             if (missingGroup) {
@@ -1757,7 +1830,14 @@ const eventHandlers = {
                 message += `- (${item.quantity}x) ${item.description} - ${utils.formatCurrency(item.price * item.quantity)}\n`;
                 if (item.adicionaisSelecionados?.length) {
                     const additions = item.adicionaisSelecionados
-                        .map(additional => `${additional.nome} (${additional.preco === 0 ? 'Grátis' : `+ ${utils.formatCurrency(additional.preco)}`})`)
+                        .map(additional => {
+                            const quantity = additional.quantidade || 1;
+                            const subtotal = additional.preco * quantity;
+                            const detail = additional.preco === 0
+                                ? `${quantity}x Grátis`
+                                : `${quantity}x ${utils.formatCurrency(additional.preco)} = ${utils.formatCurrency(subtotal)}`;
+                            return `${additional.nome} (${detail})`;
+                        })
                         .join(', ');
                     message += `  Adicionais: ${additions}\n`;
                 }
