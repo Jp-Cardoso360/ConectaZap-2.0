@@ -1947,7 +1947,7 @@ const eventHandlers = {
                 }
                 return line;
             });
-            message += `${orderLines.join('\n------------------------------\n')}\n\n`;
+            message += `${orderLines.join('\n-------------------------------------------------\n')}\n\n`;
 
             message += `*Resumo:*\n\n`;
             message += `- Subtotal: ${utils.formatCurrency(subtotal)}\n`;
