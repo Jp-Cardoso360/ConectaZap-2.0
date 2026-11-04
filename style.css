@@ -2586,6 +2586,7 @@ body.store-suspended {
     border-color: #86efac;
     background: #dcfce7;
     color: #166534;
+    animation: store-status-open-pulse 2.4s ease-in-out infinite;
 }
 
 .store-opening-status.is-closed,
@@ -2593,6 +2594,25 @@ body.store-suspended {
     border-color: #fca5a5;
     background: #fee2e2;
     color: #991b1b;
+    animation: store-status-closed-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes store-status-open-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.12);
+    }
+    50% {
+        box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.2);
+    }
+}
+
+@keyframes store-status-closed-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.1);
+    }
+    50% {
+        box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.16);
+    }
 }
 
 .store-opening-status.is-unavailable,
@@ -3304,5 +3324,25 @@ body.store-suspended {
         width: 24px;
         height: 24px;
         flex-basis: 24px;
+    }
+}
+
+.product-card.product-card-reveal {
+    opacity: 0;
+    transform: translateY(8px);
+    animation: none;
+    transition: opacity 220ms ease-out, transform 220ms ease-out;
+}
+
+.product-card.product-card-reveal.is-revealed {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .product-card.product-card-reveal {
+        opacity: 1;
+        transform: none;
+        transition: none;
     }
 }

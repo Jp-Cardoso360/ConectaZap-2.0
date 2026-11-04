@@ -6,7 +6,6 @@ const CONFIG = {
             : 'https://netix-zae-api.vercel.app'
     ),
     DEFAULT_PRIMARY_COLOR: "#2ECC71",
-    ANIMATION_DELAY: 100,
     CART_STORAGE_KEY: "conectazap_cart",
     GOAL_STORAGE_KEY: "conectazap_goal_achieved"
 };
@@ -795,6 +794,7 @@ const ui = {
         groups: [],
         quantity: 1
     },
+    productRevealObserver: null,
 
     storeDetailsOpen: false,
     storeDetailsPreviousOverflow: '',
@@ -824,6 +824,29 @@ const ui = {
     hideStoreStatus() {
         elements.storeStatus.classList.add('hidden');
         elements.productsGrid.classList.remove('hidden');
+    },
+
+    revealProductCards(cards) {
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reducedMotion || !('IntersectionObserver' in window)) {
+            cards.forEach(card => card.classList.add('is-revealed'));
+            return;
+        }
+
+        if (!this.productRevealObserver) {
+            this.productRevealObserver = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) return;
+                    entry.target.classList.add('is-revealed');
+                    this.productRevealObserver.unobserve(entry.target);
+                });
+            }, {
+                threshold: 0.08,
+                rootMargin: '0px 0px 24px 0px'
+            });
+        }
+
+        cards.forEach(card => this.productRevealObserver.observe(card));
     },
 
     updateStoreOpeningStatus() {
@@ -1226,7 +1249,6 @@ const ui = {
         );
 
         elements.productsGrid.replaceChildren(elements.categoryLoading);
-        let productIndex = 0;
 
         const renderCategorySection = (categoryId, categoryName, categoryProducts) => {
             const section = document.createElement('section');
@@ -1250,8 +1272,7 @@ const ui = {
                 productElement.dataset.categoryId = categoryId;
                 productElement.dataset.searchText =
                     `${product.description} ${product.description2 || ''}`.toLocaleLowerCase('pt-BR');
-                productElement.style.animationDelay =
-                    `${productIndex++ * CONFIG.ANIMATION_DELAY}ms`;
+                productElement.classList.add('product-card-reveal');
 
                 const imageContainer = document.createElement('div');
                 imageContainer.className = 'product-image-container';
@@ -1343,6 +1364,8 @@ const ui = {
         if (uncategorizedProducts.length > 0) {
             renderCategorySection('uncategorized', 'Sem categoria', uncategorizedProducts);
         }
+
+        this.revealProductCards([...elements.productsGrid.querySelectorAll('.product-card-reveal')]);
 
         elements.productsEmpty.classList.toggle(
             'hidden',
