@@ -1920,44 +1920,39 @@ const eventHandlers = {
             // Build WhatsApp message
             const businessName = (appState.currentUser?.name || 'ConectaZap').toLocaleUpperCase('pt-BR');
             const deliveryLabel = needsAddress ? 'Bairro' : 'Retirada';
-            let message = `*NOVO PEDIDO - ${businessName}*\n\n`;
-            message += `*Cliente:* ${customerName}\n`;
-            message += `*${deliveryLabel}:* ${deliveryPlace.name}\n`;
+            let message = `NOVO PEDIDO - ${businessName}\n\n`;
+            message += `Cliente: ${customerName}\n`;
+            message += `${deliveryLabel}: ${deliveryPlace.name}\n`;
             if (needsAddress) {
-                message += `*Endereço:* ${customerAddress}\n`;
+                message += `Endereço: ${customerAddress}\n`;
             }
-            message += `*Pagamento:* ${paymentMethod}\n\n`;
-            message += `*Itens do Pedido:*\n`;
+            message += `Pagamento: ${paymentMethod}\n\n`;
+            message += `Itens do Pedido:\n`;
 
-            appState.getGroupedCartItems(cartItems).forEach(item => {
+            const orderLines = appState.getGroupedCartItems(cartItems).map(item => {
+                const additions = item.adicionaisSelecionados || [];
                 const lineTotal = item.price * item.quantity;
-                message += `- (${item.quantity}x) ${item.description} — ${utils.formatCurrency(item.price)} cada | Subtotal: ${utils.formatCurrency(lineTotal)}\n`;
-                if (item.adicionaisSelecionados?.length) {
-                    const additions = item.adicionaisSelecionados
-                        .map(additional => {
-                            const quantity = Number(additional.quantidade || 1);
-                            const subtotal = Number(additional.preco) * quantity;
-                            const detail = Number(additional.preco) === 0
-                                ? `${quantity}x Grátis`
-                                : `${quantity}x ${utils.formatCurrency(additional.preco)} = ${utils.formatCurrency(subtotal)}`;
-                            return `${additional.nome} (${detail})`;
-                        })
+                let line = `- (${item.quantity}x) ${item.description} - ${utils.formatCurrency(lineTotal)}`;
+
+                if (additions.length) {
+                    const additionNames = additions
+                        .map(additional => `${Number(additional.quantidade || 1)}x ${additional.nome}`)
                         .join(', ');
-                    const appliesTo = item.quantity > 1
-                        ? `vale para todas as ${item.quantity} unidades`
-                        : 'por unidade';
-                    message += `  Personalização (${appliesTo}): ${additions}\n`;
+                    line += `\n  Adicionais: ${additionNames}${item.quantity > 1 ? ' (por unidade)' : ''}`;
                 }
+
                 const observation = (item.observation || '').trim();
                 if (observation) {
-                    message += ` _Obs: ${observation.replace(/\r?\n/g, '\n  ')}_\n`;
+                    line += `\n  Obs: ${observation.replace(/\r?\n/g, ' ')}`;
                 }
+                return line;
             });
+            message += `${orderLines.join('\n')}\n\n`;
 
-            message += `\n*Resumo:*\n`;
+            message += `Resumo:\n\n`;
             message += `- Subtotal: ${utils.formatCurrency(subtotal)}\n`;
             message += `- Taxa de entrega: ${utils.formatCurrency(deliveryFee)}\n`;
-            message += `*Valor Total: ${utils.formatCurrency(total)}*`;
+            message += `Valor Total: ${utils.formatCurrency(total)}`;
 
             // Send to WhatsApp
             const whatsappUrl = `https://api.whatsapp.com/send?phone=${appState.currentUser?.phone}&text=${encodeURIComponent(message)}`;
