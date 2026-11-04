@@ -1103,8 +1103,8 @@ body {
 
 /* ===== FOOTER ===== */
 .footer {
-    background: var(--secondary-color);
-    color: white;
+    background: var(--primary-color);
+    color: #fff;
     text-align: center;
     padding: var(--spacing-xl);
     margin-top: auto;
@@ -1112,17 +1112,18 @@ body {
 
 .footer-content p {
     font-size: var(--font-size-sm);
+    color: #fff;
 }
 
 .footer-content a {
-    color: var(--primary-light);
+    color: #fff;
     text-decoration: none;
     font-weight: 500;
     transition: color var(--transition-fast);
 }
 
 .footer-content a:hover {
-    color: white;
+    color: rgba(255, 255, 255, 0.82);
 }
 
 /* ===== RESPONSIVE DESIGN ===== */
