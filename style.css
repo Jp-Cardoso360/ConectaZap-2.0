@@ -3346,3 +3346,104 @@ body.store-suspended {
         transition: none;
     }
 }
+
+.store-closed-notice {
+    position: fixed;
+    inset: 0;
+    z-index: 2200;
+    display: grid;
+    place-items: center;
+    padding: 1.25rem;
+    background: rgba(15, 23, 42, 0.58);
+    backdrop-filter: blur(5px);
+}
+
+.store-closed-notice.hidden {
+    display: none;
+}
+
+.store-closed-card {
+    width: min(100%, 420px);
+    padding: clamp(1.5rem, 6vw, 2.25rem);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 1.25rem;
+    background: var(--surface-color);
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
+    text-align: center;
+    animation: store-closed-card-enter 220ms ease-out both;
+}
+
+.store-closed-icon {
+    display: grid;
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 1rem;
+    place-items: center;
+    border-radius: 50%;
+    background: #fee2e2;
+    color: #b91c1c;
+    font-size: 1.6rem;
+}
+
+.store-closed-eyebrow {
+    margin: 0 0 0.5rem;
+    color: #b91c1c;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.store-closed-card h2 {
+    margin: 0 0 0.75rem;
+    color: var(--text-primary);
+    font-size: clamp(1.25rem, 5vw, 1.55rem);
+    line-height: 1.3;
+}
+
+.store-closed-card > p:not(.store-closed-eyebrow) {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.store-closed-confirm {
+    width: 100%;
+    min-height: 48px;
+    margin-top: 1.5rem;
+    padding: 0.75rem 1rem;
+    border: 0;
+    border-radius: 0.75rem;
+    background: var(--primary-color);
+    color: #fff;
+    font: 600 1rem var(--font-secondary);
+    cursor: pointer;
+    transition: filter var(--transition-fast), transform var(--transition-fast);
+}
+
+.store-closed-confirm:hover {
+    filter: brightness(0.94);
+    transform: translateY(-1px);
+}
+
+.store-closed-confirm:focus-visible {
+    outline: 3px solid var(--primary-dark);
+    outline-offset: 3px;
+}
+
+@keyframes store-closed-card-enter {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .store-closed-card {
+        animation: none;
+    }
+}

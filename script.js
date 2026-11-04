@@ -324,6 +324,10 @@ const elements = {
     modalPlus: document.getElementById('modal-plus'),
     modalAdditionGroups: document.getElementById('modal-addition-groups'),
     modalAddToCart: document.getElementById('modal-add-to-cart'),
+
+    // Store closed notice
+    storeClosedNotice: document.getElementById('store-closed-notice'),
+    storeClosedConfirm: document.getElementById('store-closed-confirm'),
     
     // Checkout Modal
     checkoutModal: document.getElementById('checkout-modal'),
@@ -795,6 +799,9 @@ const ui = {
         quantity: 1
     },
     productRevealObserver: null,
+    storeCatalogReady: false,
+    storeClosedNoticeDismissed: false,
+    storeClosedPreviousOverflow: '',
 
     storeDetailsOpen: false,
     storeDetailsPreviousOverflow: '',
@@ -824,6 +831,29 @@ const ui = {
     hideStoreStatus() {
         elements.storeStatus.classList.add('hidden');
         elements.productsGrid.classList.remove('hidden');
+        this.storeCatalogReady = true;
+        this.maybeShowStoreClosedNotice();
+    },
+
+    maybeShowStoreClosedNotice() {
+        if (
+            !this.storeCatalogReady ||
+            this.storeClosedNoticeDismissed ||
+            !appState.storeHoursStatus?.available ||
+            appState.storeHoursStatus.isOpen
+        ) return;
+
+        this.storeClosedPreviousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        elements.storeClosedNotice.classList.remove('hidden');
+        elements.storeClosedConfirm.focus({ preventScroll: true });
+    },
+
+    dismissStoreClosedNotice() {
+        this.storeClosedNoticeDismissed = true;
+        elements.storeClosedNotice.classList.add('hidden');
+        document.body.style.overflow = this.storeClosedPreviousOverflow;
+        elements.storeOpeningStatus.focus({ preventScroll: true });
     },
 
     revealProductCards(cards) {
@@ -872,6 +902,7 @@ const ui = {
         elements.storeOpeningStatus.classList.remove('hidden');
         this.updateStoreDetailsStatus(status);
         this.updateOrderAvailability(status);
+        this.maybeShowStoreClosedNotice();
         return status;
     },
 
@@ -1731,6 +1762,17 @@ const eventHandlers = {
 
         // Modal controls
         elements.modalClose.addEventListener('click', () => utils.hideModal(elements.productModal));
+        elements.storeClosedNotice.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                return;
+            }
+            if (event.key === 'Tab') {
+                event.preventDefault();
+                elements.storeClosedConfirm.focus();
+            }
+        });
+        elements.storeClosedConfirm.addEventListener('click', () => ui.dismissStoreClosedNotice());
         elements.checkoutClose.addEventListener('click', () => utils.hideModal(elements.checkoutModal));
         elements.successClose.addEventListener('click', () => utils.hideModal(elements.successModal));
         elements.storeOpeningStatus.addEventListener('click', () => ui.openStoreDetails());
