@@ -1,4 +1,3 @@
-// ===== CONSTANTS AND CONFIGURATION =====
 const CONFIG = {
     API_BASE_URL: window.CONECTAZAP_API_BASE_URL || (
         ['localhost', '127.0.0.1'].includes(window.location.hostname)
@@ -10,7 +9,6 @@ const CONFIG = {
     GOAL_STORAGE_KEY: "conectazap_goal_achieved"
 };
 
-// ===== GLOBAL STATE =====
 class AppState {
     constructor() {
         this.products = new Map();
@@ -28,7 +26,6 @@ class AppState {
         this.isLoading = false;
     }
 
-    // Product management
     addProduct(product) {
         this.products.set(product._id, {
             ...product,
@@ -44,7 +41,6 @@ class AppState {
         return Array.from(this.products.values());
     }
 
-    // Cart management
     updateCartItem(productId, quantity) {
         const product = this.getProduct(productId);
         if (!product) return false;
@@ -233,7 +229,6 @@ class AppState {
         this.saveCartToStorage();
     }
 
-    // Storage management
     saveCartToStorage() {
         try {
             const cartData = Array.from(this.cart.entries());
@@ -256,15 +251,11 @@ class AppState {
     }
 }
 
-// ===== GLOBAL INSTANCES =====
 const appState = new AppState();
 
-// ===== DOM ELEMENTS =====
 const elements = {
-    // Loading
     loadingScreen: document.getElementById('loading'),
     
-    // Header
     cartButton: document.getElementById('cart-toggle'),
     cartBadge: document.getElementById('cart-badge'),
     searchToggle: document.getElementById('search-toggle'),
@@ -294,13 +285,10 @@ const elements = {
     storeDetailsHours: document.getElementById('store-details-hours'),
     storeDetailsDescription: document.getElementById('store-details-description'),
     
-    // Categories
     categoriesContainer: document.getElementById('categories'),
     
-    // Products
     productsGrid: document.getElementById('products-grid'),
     
-    // Cart Sidebar
     cartSidebar: document.getElementById('cart-sidebar'),
     cartOverlay: document.getElementById('cart-overlay'),
     cartClose: document.getElementById('cart-close'),
@@ -311,7 +299,6 @@ const elements = {
     checkoutBtn: document.getElementById('checkout-btn'),
     cartOrderNotice: document.getElementById('cart-order-notice'),
     
-    // Product Modal
     productModal: document.getElementById('product-modal'),
     modalClose: document.getElementById('modal-close'),
     modalImage: document.getElementById('modal-image'),
@@ -325,11 +312,9 @@ const elements = {
     modalAdditionGroups: document.getElementById('modal-addition-groups'),
     modalAddToCart: document.getElementById('modal-add-to-cart'),
 
-    // Store closed notice
     storeClosedNotice: document.getElementById('store-closed-notice'),
     storeClosedConfirm: document.getElementById('store-closed-confirm'),
     
-    // Checkout Modal
     checkoutModal: document.getElementById('checkout-modal'),
     checkoutClose: document.getElementById('checkout-close'),
     checkoutForm: document.getElementById('checkout-form'),
@@ -344,18 +329,15 @@ const elements = {
     checkoutDeliveryFee: document.getElementById('checkout-delivery-fee'),
     checkoutTotal: document.getElementById('checkout-total'),
     
-    // Success Modal
     successModal: document.getElementById('success-modal'),
     successClose: document.getElementById('success-close'),
     
-    // Goal Alert
     goalAlert: document.getElementById('goal-alert'),
     goalAmount: document.getElementById('goal-amount'),
     continueShopping: document.getElementById('continue-shopping'),
     finishOrder: document.getElementById('finish-order')
 };
 
-// ===== UTILITY FUNCTIONS =====
 const utils = {
     formatCurrency(value) {
         return new Intl.NumberFormat('pt-BR', {
@@ -660,7 +642,6 @@ const utils = {
     }
 };
 
-// ===== API FUNCTIONS =====
 const api = {
     async fetchMenuBySlug(slug) {
         try {
@@ -792,7 +773,6 @@ const api = {
 
 };
 
-// ===== UI FUNCTIONS =====
 const ui = {
     productModalState: {
         groups: [],
@@ -1052,14 +1032,11 @@ const ui = {
         const total = appState.getCartTotal();
         const itemCount = appState.getCartItemCount();
 
-        // Update totals
         elements.totalItems.textContent = itemCount;
         elements.totalPrice.textContent = utils.formatCurrency(total);
 
-        // Update checkout button
         this.updateOrderAvailability();
 
-        // Show/hide empty state
         if (cartItems.length === 0) {
             utils.showElement(elements.cartEmpty);
             utils.hideElement(elements.cartItems);
@@ -1124,7 +1101,6 @@ const ui = {
             });
         }
 
-        // Check goal achievement
         this.checkGoalAchievement(total);
     },
 
@@ -1347,7 +1323,7 @@ const ui = {
                         const quantity = document.createElement('span');
                         quantity.className = 'quantity-display';
                         quantity.id = `quantity-${product._id}`;
-                        quantity.textContent = product.quantity;
+                        quantity.textContent = String(product.quantity ?? 0);
                         quantityControls.appendChild(quantity);
                     }
 
@@ -1408,7 +1384,6 @@ const ui = {
         })), uncategorizedProducts.length > 0);
         this.filterProducts(elements.searchInput.value);
 
-        // Add quantity control event listeners
         this.attachQuantityControls();
     },
 
@@ -1432,7 +1407,6 @@ const ui = {
                 this.updateCartBadge();
                 this.updateCartSidebar();
 
-                // Add bounce animation to cart button
                 if (newQuantity > previousQuantity) {
                     utils.animateElement(elements.cartButton, 'bounce');
                 }
@@ -1443,7 +1417,7 @@ const ui = {
     updateProductQuantityDisplay(productId, quantity) {
         const quantityElement = document.getElementById(`quantity-${productId}`);
         if (quantityElement) {
-            quantityElement.textContent = quantity;
+            quantityElement.textContent = String(quantity ?? 0);
         }
     },
 
@@ -1701,7 +1675,6 @@ const ui = {
         utils.hideModal(elements.checkoutModal);
         utils.showModal(elements.successModal);
         
-        // Clear cart after successful order
         appState.clearCart();
         this.updateCartBadge();
         this.updateCartSidebar();
@@ -1715,10 +1688,8 @@ const ui = {
     }
 };
 
-// ===== EVENT HANDLERS =====
 const eventHandlers = {
     init() {
-        // Cart controls
         elements.cartButton.addEventListener('click', () => ui.openCart());
         elements.cartClose.addEventListener('click', () => ui.closeCart());
         elements.cartOverlay.addEventListener('click', () => ui.closeCart());
@@ -1760,7 +1731,6 @@ const eventHandlers = {
             elements.searchInput.focus();
         });
 
-        // Modal controls
         elements.modalClose.addEventListener('click', () => utils.hideModal(elements.productModal));
         elements.storeClosedNotice.addEventListener('keydown', event => {
             if (event.key === 'Escape') {
@@ -1791,7 +1761,6 @@ const eventHandlers = {
         });
         window.setInterval(() => ui.updateStoreOpeningStatus(), 60_000);
 
-        // Product modal quantity controls
         elements.modalMinus.addEventListener('click', () => {
             ui.productModalState.quantity = Math.max(1, ui.productModalState.quantity - 1);
             elements.modalQuantity.textContent = ui.productModalState.quantity;
@@ -1867,23 +1836,18 @@ const eventHandlers = {
             appState.updateProductObservation(productId, elements.modalObservation.value);
         });
 
-        // Checkout form
         elements.checkoutForm.addEventListener('submit', this.handleCheckoutSubmit);
 
-        // Goal alert controls
         elements.continueShopping.addEventListener('click', () => utils.hideModal(elements.goalAlert));
         elements.finishOrder.addEventListener('click', () => {
             utils.hideModal(elements.goalAlert);
             ui.showCheckoutModal();
         });
 
-        // Category controls
         this.initCategoryControls();
 
-        // Keyboard navigation
         document.addEventListener('keydown', this.handleKeydown);
 
-        // Close modals on escape key
         document.addEventListener('keydown', (e) => {
             if (ui.storeDetailsOpen) {
                 if (e.key === 'Escape') {
@@ -1982,7 +1946,6 @@ const eventHandlers = {
             const deliveryFee = deliveryPlace.fee;
             const total = subtotal + deliveryFee;
 
-            // Build WhatsApp message
             const businessName = (appState.currentUser?.name || 'ConectaZap').toLocaleUpperCase('pt-BR');
             const deliveryLabel = needsAddress ? 'Bairro' : 'Retirada';
             let message = `*NOVO PEDIDO - ${businessName}*\n\n`;
@@ -2019,11 +1982,9 @@ const eventHandlers = {
             message += `- Taxa de entrega: ${utils.formatCurrency(deliveryFee)}\n`;
             message += `*Valor Total: ${utils.formatCurrency(total)}*`;
 
-            // Send to WhatsApp
             const whatsappUrl = `https://api.whatsapp.com/send?phone=${appState.currentUser?.phone}&text=${encodeURIComponent(message)}`;
             window.open(whatsappUrl, '_blank');
 
-            // Show success modal
             ui.showSuccessModal();
 
         } catch (error) {
@@ -2034,7 +1995,6 @@ const eventHandlers = {
 
     handleKeydown(e) {
         if (ui.storeDetailsOpen) return;
-        // Add keyboard shortcuts
         if (e.ctrlKey || e.metaKey) {
             switch (e.key) {
                 case 'k':
@@ -2046,7 +2006,6 @@ const eventHandlers = {
     }
 };
 
-// ===== INITIALIZATION =====
 const app = {
     async init() {
         ui.showLoading();
@@ -2225,12 +2184,10 @@ const app = {
     }
 };
 
-// ===== START APPLICATION =====
 document.addEventListener('DOMContentLoaded', () => {
     app.init();
 });
 
-// ===== EXPORT FOR DEBUGGING =====
 if (typeof window !== 'undefined') {
     window.ConectaZapApp = {
         appState,
